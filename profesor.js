@@ -951,7 +951,7 @@ function verDibujo(src) {
 }
 
 // Lógica de navegación común a control y proyector
-function controlSesion(code, items, alCambiar) {
+function controlSesion(code, items, alCambiar, { lessonId, diapos } = {}) {
   let ses = null, resp = {}, itemSub = null, itemId = null;
   const idx = () => ses?.state?.index ?? 0;
   const ir = i => {
@@ -982,8 +982,17 @@ function controlSesion(code, items, alCambiar) {
     const nuevos = s.val() || [];
     if (JSON.stringify(nuevos) === JSON.stringify(items)) return;
     items.splice(0, items.length, ...nuevos);
-    alCambiar('items');
+    recargarDiapos().then(() => alCambiar('items'));
   }));
+  // Si se ha reemplazado el PDF, las diapositivas cambian
+  async function recargarDiapos() {
+    if (!diapos || !lessonId) return;
+    try {
+      const d = (await get(ref(db, `slides/${U.uid}/${lessonId}`))).val() || {};
+      for (const k of Object.keys(diapos)) delete diapos[k];
+      Object.assign(diapos, d);
+    } catch (e) { console.error(e); }
+  }
   document.onkeydown = e => {
     if (e.target.closest('input, textarea, select') || dlg.open) return;
     if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); ir(idx() + 1); }
@@ -996,10 +1005,34 @@ function controlSesion(code, items, alCambiar) {
     // Inserta pasos tras el actual, en esta clase, y va al primero
     insertar: async nuevos => {
       const i = idx();
-      const lista = [...items.slice(0, i + 1), ...nuevos, ...items.slice(i + 1)];
+      const lista = [...items.slice(0, i + 1), ...nuevos.map(n => ({ ...n, enDirecto: true })), ...items.slice(i + 1)];
       await set(ref(db, `teacherSessions/${U.uid}/${code}/items`), lista);
       if (JSON.stringify(lista) !== JSON.stringify(items)) { items.splice(0, items.length, ...lista); alCambiar('items'); }
       ir(i + 1);
+    },
+    // Trae los cambios de la lección. Conserva las actividades añadidas en el directo y el paso actual
+    actualizar: async () => {
+      const l = (await get(ref(db, `lessons/${U.uid}/${lessonId}`))).val();
+      if (!l) throw new Error('La lección ya no existe.');
+      const lista = [...(l.items || [])];
+      items.forEach((it, k) => {
+        if (!it.enDirecto || lista.some(x => x.id === it.id)) return;
+        let j = -1;
+        for (let m = k - 1; m >= 0 && j < 0; m--) j = lista.findIndex(x => x.id === items[m].id);
+        lista.splice(j + 1, 0, it);
+      });
+      if (!lista.length) throw new Error('La lección está vacía.');
+      const i = idx(), actual = items[i];
+      let ni = lista.findIndex(x => x.id === actual?.id);
+      if (ni < 0) ni = Math.min(i, lista.length - 1);
+      const mismo = JSON.stringify(lista[ni]) === JSON.stringify(actual);
+      const iguales = JSON.stringify(lista) === JSON.stringify(items);
+      await set(ref(db, `teacherSessions/${U.uid}/${code}/items`), lista);
+      await update(ref(db, `teacherSessions/${U.uid}/${code}`), { lessonTitle: l.title });
+      if (!iguales) { items.splice(0, items.length, ...lista); await recargarDiapos(); alCambiar('items'); }
+      if (mismo) await update(ref(db, `sessions/${code}/state`), { index: ni, total: lista.length });
+      else await set(ref(db, `sessions/${code}/state`), estado(lista, ni));
+      return { iguales, mismo };
     },
     abrir: () => update(ref(db, `sessions/${code}/state`), { open: !ses.state.open }),
     revelar: () => {
@@ -1031,6 +1064,7 @@ async function vistaDirecto(code) {
         <button class="btn" id="invitados" aria-pressed="false">Permitir entrar sin cuenta</button>
         <a class="btn" href="#/proyectar/${code}" target="_blank" rel="noopener">Abrir vista para proyectar</a>
         <a class="btn" href="#/informe/${code}">Informe</a>
+        <button class="btn" id="actualizar" title="Trae los cambios que hayas hecho en la lección. Se conservan las respuestas y las actividades añadidas en el directo.">Actualizar con la lección</button>
         <button class="btn peligro" id="finalizar">Finalizar clase</button>
       </div>
     </div>
@@ -1045,10 +1079,10 @@ async function vistaDirecto(code) {
   </section>`);
 
   const C = controlSesion(code, items, motivo => {
-    if (motivo === 'items') { const t = $('#tira'); if (t) t.dataset.hecha = ''; }
+    if (motivo === 'items') { const t = $('#tira'); if (t) t.dataset.hecha = ''; const a = $('#actual'); if (a) a.dataset.k = ''; }
     if (motivo === 'sesion' || motivo === 'items') { pintarControles(); pintarTira(); }
     pintarActual(); pintarRoster();
-  });
+  }, { lessonId: priv.lessonId, diapos });
 
   function pintarActual() {
     const el = $('#actual'); if (!el || !C.ses) return;
@@ -1135,6 +1169,14 @@ async function vistaDirecto(code) {
       return dialogoActividad(null, paginas, (...nuevos) => C.insertar(nuevos), { directo: true, diapos });
     }
     if (e.target.closest('#revelar')) return C.revelar();
+    const act = e.target.closest('#actualizar');
+    if (act) {
+      act.disabled = true; act.textContent = 'Actualizando…';
+      try { const r = await C.actualizar(); act.textContent = r.iguales ? 'Ya estaba al día' : 'Actualizada'; }
+      catch (err) { console.error(err); act.textContent = 'No se ha podido actualizar'; alert(err.message || 'No se ha podido actualizar.'); }
+      setTimeout(() => { act.disabled = false; act.textContent = 'Actualizar con la lección'; }, 2500);
+      return;
+    }
     const vd = e.target.closest('.ver-dibujo'); if (vd) return verDibujo(vd.dataset.src);
     if (e.target.closest('#vercodigo')) return update(ref(db, `sessions/${code}`), { showCode: !C.ses.showCode });
     if (e.target.closest('#invitados')) return permitirInvitados(code, priv.lessonId, !C.ses.guests);
@@ -1185,7 +1227,7 @@ async function vistaProyector(code) {
   $('#pc').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
   app.querySelector('.proyector').onclick = e => { const vd = e.target.closest('.ver-dibujo'); if (vd) verDibujo(vd.dataset.src); };
 
-  const C = controlSesion(code, items, () => pintar());
+  const C = controlSesion(code, items, m => { if (m === 'items') $('#escena').dataset.k = ''; pintar(); }, { lessonId: priv.lessonId, diapos });
   function pintar() {
     const ses = C.ses; if (!ses) return;
     $('#banda').hidden = !ses.showCode || !!ses.endedAt;
