@@ -2,7 +2,7 @@ import { auth, db, configurado } from './firebase.js';
 import { NOMBRE_APP, DOMINIO_ALUMNADO } from './config.js';
 import { GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, onValue, onDisconnect, serverTimestamp, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-import { esc, rico, conDatos, esActividad, infoEnlace, lista, MAX_MURO, POR_PARTES, pintarPartes, leerPartes, moverOrden, aciertosPorParte, reducirImagen, pintarSopa, lineaSopa, palabraSopa, nombreTipo, comprobar, respuestaHTML, solucionTexto, esCorregible } from './lib.js';
+import { esc, rico, conDatos, esActividad, infoEnlace, lista, MAX_MURO, POR_PARTES, pintarPartes, leerPartes, moverOrden, aciertosPorParte, reducirImagen, colorCurso, pintarSopa, lineaSopa, palabraSopa, nombreTipo, comprobar, respuestaHTML, solucionTexto, esCorregible } from './lib.js';
 
 const app = document.getElementById('app');
 const S = { code: null, alias: '', uid: null, session: null, slides: {}, resp: null, respItem: null, respUnsub: null, key: '', invitado: false };
@@ -197,6 +197,7 @@ function pintar() {
     app.innerHTML = `<section class="entrada"><h1>La clase ha terminado</h1><p>Gracias, ${esc(S.alias)}. Ya puedes cerrar esta página.</p></section>`;
     return;
   }
+  colorCurso(ses.curso);
   const st = ses.state || {};
   const it = st.item;
   const key = [it?.id, st.open, st.reveal, JSON.stringify(S.resp?.value ?? null), JSON.stringify(st.results ?? null)].join('|');

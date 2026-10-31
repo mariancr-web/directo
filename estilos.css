@@ -562,3 +562,142 @@ h1 + .chip-clase { margin: 0 0 .4rem; }
 .sel-curso { width: auto; margin: 0; }
 .grupos { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: 1rem 0; }
 .dlg-estrecho { max-width: 26rem; }
+
+/* ══ Guía de webs y herramientas (31-10-2026) ══════════════════════════ */
+:root { --banda: #1E293B; --tarjeta-borde: #E2E8F0; --sombra: 0 6px 18px rgba(15, 23, 42, .08); --f-titulos: "Barlow", "Segoe UI", system-ui, sans-serif; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --banda: #020617; --tarjeta-borde: #334155; --sombra: 0 6px 18px rgba(0, 0, 0, .35); } }
+:root[data-theme="dark"] { --banda: #020617; --tarjeta-borde: #334155; --sombra: 0 6px 18px rgba(0, 0, 0, .35); }
+.curso-sin { --acento: #64748B; --texto: #475569; --suave: #F1F5F9; }
+/* Los alias antiguos siguen al acento del curso */
+.curso-general, .curso-1eso, .curso-2eso, .curso-4eso, .curso-1bach, .curso-2bach, .curso-sin { --azul: var(--acento); --azul-hondo: var(--texto); --naranja: var(--acento); }
+body { overflow-x: hidden; }
+
+/* Herramientas: títulos en Barlow (Fraunces queda para los materiales) */
+h1, h2 { font-family: var(--f-marca); font-variation-settings: normal; }
+h1 { font-weight: 700; letter-spacing: -.01em; }
+h2 { font-weight: 600; }
+.bloque > h2, .informe > h2, .directo h2.seccion { display: flex; align-items: center; gap: .6rem; }
+.bloque > h2::before, .informe > h2::before { content: ""; flex: none; width: 22px; height: 4px; border-radius: 2px; background: var(--acento); }
+.enunciado, .entrada h1, .acceso h1 { font-family: var(--f-marca); }
+
+/* Botones: principal en --texto del curso (contraste) */
+.btn { border-radius: 6px; transition: transform .15s, box-shadow .15s, background-color .15s; }
+.btn.primario { background: var(--texto); border-color: var(--texto); color: #fff; }
+.btn.primario:hover:not(:disabled) { background: color-mix(in srgb, var(--texto) 82%, #000); border-color: color-mix(in srgb, var(--texto) 82%, #000); }
+.btn.peligro { color: var(--mal); border-color: color-mix(in srgb, var(--mal) 40%, var(--linea)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primario { background: var(--acento); border-color: var(--acento); color: #0F172A; } }
+:root[data-theme="dark"] .btn.primario { background: var(--acento); border-color: var(--acento); color: #0F172A; }
+
+/* Cabecera: tinta, logo en negativo, filete de 4 px en el acento */
+.barra { background: var(--banda); color: #fff; border-bottom: 4px solid var(--acento); box-shadow: none; }
+.marca { color: #fff; }
+.marca-nombre { color: rgba(255, 255, 255, .78); border-left-color: rgba(255, 255, 255, .25); letter-spacing: .16em; }
+.usuario { color: rgba(255, 255, 255, .85); }
+.usuario .btn { color: #fff; background: transparent; border-color: rgba(255, 255, 255, .35); }
+.usuario .btn:hover:not(:disabled) { border-color: #fff; }
+
+/* Franja hero con trama milimetrada blanca */
+.trama-blanca, .hero {
+  background-color: var(--banda);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .07) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+}
+.hero {
+  color: #fff; min-height: 9rem;
+  margin: -1.5rem calc(50% - 50vw) 2rem; padding: 2rem max(1.25rem, calc(50vw - 50%));
+}
+.hero h1 { color: #fff; margin-bottom: .25rem; }
+.hero .meta, .hero .ayuda, .hero p { color: rgba(255, 255, 255, .78); }
+.hero a:not(.btn) { color: #fff; }
+.hero .btn:not(.primario) { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .4); }
+.hero .btn:not(.primario):hover:not(:disabled) { border-color: #fff; background: rgba(255, 255, 255, .08); }
+.hero .btn.peligro { color: #FCA5A5; border-color: rgba(252, 165, 165, .55); }
+.hero .btn.primario { color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hero .btn.primario { color: #0F172A; } }
+:root[data-theme="dark"] .hero .btn.primario { color: #0F172A; }
+.hero .cab-bloque { margin-bottom: 0; align-items: flex-end; }
+.hero.cab-bloque, .hero.cab-editor, .hero.cab-directo { margin-bottom: 1.75rem; }
+.hero .titulo-input { color: #fff; }
+.hero .titulo-input:hover, .hero .titulo-input:focus { border-color: rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .06); }
+.hero .sel-curso { background: rgba(255, 255, 255, .95); color: #1E293B; }
+.hero .codigo-grande { color: #fff; }
+.hero .chip-clase { background: var(--acento); color: #fff; }
+.hero-inicio .pestanas-clase { margin-bottom: 1.5rem; }
+
+/* Pestañas de clase (sobre la franja) */
+.pestana { background: rgba(255, 255, 255, .06); color: #fff; border: 1px solid rgba(255, 255, 255, .25); border-left: 4px solid var(--acento); border-radius: 6px; transition: background-color .15s; }
+.pestana:hover { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .5); border-left-color: var(--acento); }
+.pestana[aria-pressed="true"] { background: var(--acento); border-color: var(--acento); color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pestana[aria-pressed="true"] { color: #0F172A; } }
+:root[data-theme="dark"] .pestana[aria-pressed="true"] { color: #0F172A; }
+
+/* Tarjetas */
+.lista { border-top: 0; display: grid; gap: .75rem; }
+.lista .fila, .lista .fila[class*="curso-"] { background: var(--superficie); border: 1px solid var(--tarjeta-borde); border-left: 5px solid var(--acento); border-radius: 6px; padding: 18px 22px; transition: transform .15s, box-shadow .15s; }
+.lista .fila:hover { transform: translateY(-2px); box-shadow: var(--sombra); }
+.lista .fila.en-curso { border-left-color: #16A34A; }
+.lista .fila.terminada { border-left-color: #CBD5E1; }
+.fila-titulo { font-family: var(--f-marca); font-weight: 600; font-size: 1.1rem; }
+.tarjeta-vacia { list-style: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1rem; background: var(--superficie); border: 1px dashed var(--tarjeta-borde); border-left: 5px solid var(--acento); border-radius: 6px; padding: 18px 22px; }
+.tarjeta-vacia p { margin: 0; color: var(--tinta-suave); }
+@media (prefers-reduced-motion: reduce) { .lista .fila, .btn { transition: none; } .lista .fila:hover { transform: none; } }
+
+/* «En curso»: píldora con punto que parpadea */
+.pildora-en-curso { display: inline-flex; align-items: center; gap: .4rem; padding: .15rem .6rem; border-radius: 999px; background: #DCFCE7; color: #15803D; font-family: var(--f-marca); font-weight: 600; font-size: .8rem; letter-spacing: .03em; }
+.pildora-en-curso::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: #16A34A; animation: latido 1.4s ease-in-out infinite; }
+@keyframes latido { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .pildora-en-curso::before { animation: none; } }
+.hero .pildora-en-curso { margin-top: .4rem; }
+
+/* «Todas»: secciones desplegables por curso */
+.seccion-curso { margin: 0 0 .75rem; border: 1px solid var(--tarjeta-borde); border-left: 5px solid var(--acento); border-radius: 6px; background: var(--superficie); }
+.seccion-curso summary { display: flex; align-items: center; gap: .75rem; padding: 14px 18px; cursor: pointer; list-style: none; }
+.seccion-curso summary::-webkit-details-marker { display: none; }
+.seccion-curso .chip-relleno { padding: .2rem .7rem; border-radius: 999px; background: var(--texto); color: #fff; font-family: var(--f-marca); font-weight: 700; font-size: .85rem; letter-spacing: .03em; }
+.seccion-curso .materia { font-weight: 600; }
+.seccion-curso .cuenta-lec { margin-left: auto; color: var(--tinta-suave); font-size: .9rem; }
+.seccion-curso .flecha { font-size: 1.4rem; line-height: 1; color: var(--tinta-suave); transition: transform .2s; }
+.seccion-curso[open] { background: #F8FAFC; }
+.seccion-curso[open] .flecha { transform: rotate(90deg); }
+.seccion-curso > .lista { padding: 0 18px 18px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .seccion-curso[open] { background: #172033; } :root:not([data-theme="light"]) .seccion-curso .chip-relleno { color: #0F172A; background: var(--acento); } }
+:root[data-theme="dark"] .seccion-curso[open] { background: #172033; }
+:root[data-theme="dark"] .seccion-curso .chip-relleno { color: #0F172A; background: var(--acento); }
+
+/* Pie */
+.pie-web { text-align: center; padding: 1.5rem 1rem 2rem; font-family: var(--f-marca); font-weight: 600; font-size: .75rem; letter-spacing: .16em; text-transform: uppercase; color: var(--tinta-suave); }
+
+/* Alumnado: barra superior en tinta con filete del curso */
+.barra-alumno { background: var(--banda); color: #fff; border-bottom: 4px solid var(--acento); }
+.barra-alumno .codigo-mini { color: #fff; }
+.barra-alumno .pos { color: rgba(255, 255, 255, .75); }
+.barra-alumno .btn-pc { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .35); }
+
+/* Pantallas de acceso (alumnado y docente) */
+body:has(.entrada), body:has(.acceso) {
+  background-color: var(--papel);
+  background-image:
+    linear-gradient(rgba(37, 99, 235, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(37, 99, 235, .06) 1px, transparent 1px),
+    linear-gradient(rgba(37, 99, 235, .03) 1px, transparent 1px), linear-gradient(90deg, rgba(37, 99, 235, .03) 1px, transparent 1px);
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+}
+body:has(.entrada)::before, body:has(.acceso)::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 38vh; z-index: 0;
+  background-color: var(--banda);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .07) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+}
+.entrada, .acceso {
+  position: relative; z-index: 1; max-width: 440px; margin: 14vh auto 3rem; padding: 2rem 1.75rem 1.5rem;
+  background: var(--superficie); border-top: 5px solid var(--acento); border-radius: 8px; box-shadow: 0 12px 32px rgba(15, 23, 42, .14);
+}
+@media (max-width: 30rem) { .entrada, .acceso { margin: 10vh 16px 2rem; padding: 1.5rem 1.25rem 1.25rem; } }
+.entrada h1, .acceso h1 { font-size: 1.9rem; margin-bottom: 1.25rem; }
+.acceso .btn.grande { width: 100%; }
+.logo-entrada { height: 40px; margin-bottom: 1.25rem; }
+.acceso-docente { margin-top: 1.5rem; }
+@media (max-width: 30rem) { .marca-nombre { display: none; } .usuario > span { display: none; } }

@@ -2,7 +2,7 @@ import { auth, db, configurado } from './firebase.js';
 import { NOMBRE_APP } from './config.js';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, remove, onValue, serverTimestamp, query, orderByChild, limitToLast } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-import { esc, rico, conDatos, conNombres, TIPOS, nombreTipo, esActividad, esCorregible, itemPublico, comprobar, textoRespuesta, solucionTexto, generarCodigo, nuevoId, parseNum, fecha, evaluar, postsMuro, MAX_MURO, POR_PARTES, pintarPartes, solucionesHuecos, filasTabla, tieneVariantes, valores, datosTexto, fmtNum, infoEnlace, buscarEnlaces, CURSOS, CLASES, cursoDe, nombreClase, reducirImagen, alternativas, generarSopa, normSopa, pintarSopa } from './lib.js';
+import { esc, rico, conDatos, conNombres, TIPOS, nombreTipo, esActividad, esCorregible, itemPublico, comprobar, textoRespuesta, solucionTexto, generarCodigo, nuevoId, parseNum, fecha, evaluar, postsMuro, MAX_MURO, POR_PARTES, pintarPartes, solucionesHuecos, filasTabla, tieneVariantes, valores, datosTexto, fmtNum, infoEnlace, buscarEnlaces, CURSOS, CLASES, cursoDe, nombreClase, colorCurso, reducirImagen, alternativas, generarSopa, normSopa, pintarSopa } from './lib.js';
 
 const app = document.getElementById('app');
 const dlg = document.getElementById('dlg');
@@ -22,14 +22,16 @@ function reset() {
   limpiar = [];
   document.onkeydown = null;
   document.body.classList.remove('modo-proyector');
+  colorCurso('');
   if (dlg.open) dlg.close();
 }
 
 function marco(html) {
   return `<header class="barra">
-    <a class="marca" href="#/"><img class="logo-claro" src="logo.svg" alt="mariancr"><span class="marca-nombre">${esc(NOMBRE_APP)}</span></a>
+    <a class="marca" href="#/"><img src="logo-negativo.svg" alt="mariancr"><span class="marca-nombre">${esc(NOMBRE_APP)}</span></a>
     <div class="usuario"><span>${esc(U?.displayName || U?.email || '')}</span><button class="btn peq" id="salir">Salir</button></div>
-  </header><main class="contenido">${html}</main>`;
+  </header><main class="contenido">${html}</main>
+  <footer class="pie-web">mariancr · ${esc(NOMBRE_APP)}</footer>`;
 }
 
 function enlaceAlumno(code) {
@@ -106,12 +108,15 @@ const chipClase = (curso, grupo) => curso && cursoDe(curso) ? `<span class="chip
 function vistaInicio() {
   let filtro = leerFiltro();
   if (filtro !== 'todas' && filtro !== 'sin' && !CLASES.some(c => c.id === filtro)) filtro = 'todas';
-  let lecciones = [], sesiones = [], cuantas = 40;
+  let lecciones = [], sesiones = [], cuantas = 40, cargadas = false;
   app.innerHTML = marco(`
-  <nav class="pestanas-clase" id="pestanas" aria-label="Clases"></nav>
-  <section class="bloque">
+  <div class="hero hero-inicio">
+    <nav class="pestanas-clase" id="pestanas" aria-label="Clases"></nav>
     <div class="cab-bloque"><h1 id="tit-lecciones">Tus lecciones</h1><div class="acciones"><a class="btn" href="#/banco">Banco de preguntas</a><button class="btn primario" id="nueva">Nueva lección</button></div></div>
-    <ul class="lista" id="lecciones"><li class="vacio">Cargando…</li></ul>
+  </div>
+  <section class="bloque">
+    <h2 id="tit-lec2">Lecciones</h2>
+    <div id="lecciones"><p class="vacio">Cargando…</p></div>
   </section>
   <section class="bloque">
     <h2 id="tit-sesiones">Clases dadas</h2>
@@ -122,7 +127,7 @@ function vistaInicio() {
   const clase = () => CLASES.find(c => c.id === filtro) || null;
   const cursoLeccion = id => lecciones.find(([k]) => k === id)?.[1].curso || '';
   // Las clases antiguas no guardaban el curso: se toma el de su lección
-  const cursoSesion = ([, s]) => s.curso ?? cursoLeccion(s.lessonId);
+  const cursoSesion = s => s.curso ?? cursoLeccion(s.lessonId);
   const pasa = (curso, grupo, esSesion) => {
     if (filtro === 'todas') return true;
     if (filtro === 'sin') return !cursoDe(curso);
@@ -132,41 +137,67 @@ function vistaInicio() {
 
   function pintarPestanas() {
     const haySin = lecciones.some(([, l]) => !cursoDe(l.curso));
-    const ps = [['todas', 'Todas', 'general'], ...CLASES.map(c => [c.id, c.nombre, c.curso]), ...(haySin ? [['sin', 'Sin curso', '']] : [])];
-    $('#pestanas').innerHTML = ps.map(([id, n, curso]) => `<button type="button" class="pestana ${curso ? 'curso-' + curso : ''}" data-filtro="${id}" aria-pressed="${filtro === id}">${esc(n)}</button>`).join('');
+    const ps = [['todas', 'Todas', 'general'], ...CLASES.map(c => [c.id, c.nombre, c.curso]), ...(haySin ? [['sin', 'Sin curso', 'sin']] : [])];
+    $('#pestanas').innerHTML = ps.map(([id, n, curso]) => `<button type="button" class="pestana curso-${curso}" data-filtro="${id}" aria-pressed="${filtro === id}">${esc(n)}</button>`).join('');
     const c = clase();
-    $('#tit-lecciones').textContent = c ? `Lecciones de ${cursoDe(c.curso).nombre} · ${c.materia}` : filtro === 'sin' ? 'Lecciones sin curso' : 'Tus lecciones';
+    $('#tit-lecciones').textContent = c ? c.nombre : filtro === 'sin' ? 'Sin curso' : 'Tus lecciones';
+    $('#tit-lec2').textContent = c ? `Lecciones de ${cursoDe(c.curso).nombre} · ${c.materia}` : 'Lecciones';
     $('#tit-sesiones').textContent = c ? `Clases dadas en ${c.nombre}` : 'Clases dadas';
-    document.querySelector('.contenido')?.setAttribute('class', `contenido${c ? ' curso-' + c.curso : ''}`);
+    colorCurso(c?.curso || '');
   }
 
+  const tarjetaLeccion = ([id, l]) => {
+    const its = l.items || [];
+    const nd = its.filter(i => i.type === 'slide').length, na = its.length - nd;
+    return `<li class="fila tarjeta ${cursoDe(l.curso) ? 'curso-' + l.curso : ''}">
+      <div class="fila-info"><a class="fila-titulo" href="#/leccion/${id}">${esc(l.title)}</a>
+        <span class="meta">${nd} ${nd === 1 ? 'diapositiva' : 'diapositivas'} y ${na} ${na === 1 ? 'actividad' : 'actividades'}</span></div>
+      <div class="fila-acc">
+        <a class="btn peq" href="#/leccion/${id}">Editar</a>
+        <button class="btn peq primario" data-empezar="${id}" ${its.length ? '' : 'disabled'}>Empezar clase${clase()?.grupo ? ' con ' + esc(clase().nombre) : ''}</button>
+        <button class="btn peq peligro" data-borrar="${id}">Eliminar</button>
+      </div></li>`;
+  };
+  const vacia = (msg, boton = true) => `<div class="tarjeta-vacia"><p>${msg}</p>${boton ? `<button class="btn primario" data-nueva>${lecciones.length ? 'Crear una lección' : 'Crear la primera lección'}</button>` : ''}</div>`;
+  const ordenar = ls => ls.sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+
+  // Secciones desplegables abiertas en «Todas» (se recuerdan)
+  const leerAbiertas = () => { try { return JSON.parse(localStorage.getItem('cd-abiertas')); } catch { return null; } };
+  const guardarAbiertas = a => { try { localStorage.setItem('cd-abiertas', JSON.stringify(a)); } catch {} };
+
   function pintarLecciones() {
-    const ul = $('#lecciones'); if (!ul) return;
-    const ls = lecciones.filter(([, l]) => pasa(l.curso)).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
-    ul.innerHTML = ls.length ? ls.map(([id, l]) => {
-      const its = l.items || [];
-      const nd = its.filter(i => i.type === 'slide').length, na = its.length - nd;
-      return `<li class="fila ${cursoDe(l.curso) ? 'curso-' + l.curso : ''}">
-        <div class="fila-info"><a class="fila-titulo" href="#/leccion/${id}">${esc(l.title)}</a>
-          <span class="meta">${filtro === 'todas' ? chipClase(l.curso) : ''}${nd} ${nd === 1 ? 'diapositiva' : 'diapositivas'} y ${na} ${na === 1 ? 'actividad' : 'actividades'}</span></div>
-        <div class="fila-acc">
-          <a class="btn peq" href="#/leccion/${id}">Editar</a>
-          <button class="btn peq primario" data-empezar="${id}" ${its.length ? '' : 'disabled'}>Empezar clase${clase()?.grupo ? ' con ' + esc(clase().nombre) : ''}</button>
-          <button class="btn peq peligro" data-borrar="${id}">Eliminar</button>
-        </div></li>`;
-    }).join('') : `<li class="vacio">${lecciones.length ? 'No hay lecciones en esta clase. Crea una con «Nueva lección» o elige el curso dentro de una lección.' : 'Aún no tienes lecciones. Crea una y sube tu presentación en PDF.'}</li>`;
+    const el = $('#lecciones'); if (!el) return;
+    if (!lecciones.length) { el.innerHTML = vacia('Aún no tienes lecciones. Crea una y sube tu presentación en PDF.'); return; }
+    if (filtro !== 'todas') {
+      const ls = ordenar(lecciones.filter(([, l]) => pasa(l.curso)));
+      el.innerHTML = ls.length ? `<ul class="lista">${ls.map(tarjetaLeccion).join('')}</ul>` : vacia('No hay lecciones en esta clase todavía.');
+      return;
+    }
+    const grupos = [...CURSOS.map(c => ({ id: c.id, nombre: c.nombre, materia: c.materia, ls: lecciones.filter(([, l]) => l.curso === c.id) })),
+      { id: 'sin', nombre: 'Sin curso', materia: 'Elige el curso dentro de cada lección', ls: lecciones.filter(([, l]) => !cursoDe(l.curso)) }].filter(g => g.ls.length);
+    let abiertas = leerAbiertas();
+    if (!abiertas) { const ult = sesiones[0] && cursoSesion(sesiones[0][1]); abiertas = [cursoDe(ult) ? ult : grupos[0]?.id]; }
+    el.innerHTML = grupos.map(g => `<details class="seccion-curso ${g.id === 'sin' ? 'curso-sin' : 'curso-' + g.id}" data-g="${g.id}" ${abiertas.includes(g.id) ? 'open' : ''}>
+      <summary><span class="chip-relleno">${esc(g.nombre)}</span><span class="materia">${esc(g.materia)}</span><span class="cuenta-lec">${g.ls.length} ${g.ls.length === 1 ? 'lección' : 'lecciones'}</span><span class="flecha" aria-hidden="true">›</span></summary>
+      <ul class="lista">${ordenar(g.ls).map(tarjetaLeccion).join('')}</ul></details>`).join('');
+    el.querySelectorAll('details').forEach(d => d.ontoggle = () => {
+      guardarAbiertas([...el.querySelectorAll('details[open]')].map(x => x.dataset.g));
+    });
   }
 
   function pintarSesiones() {
     const ul = $('#sesiones'); if (!ul) return;
-    const ss = sesiones.filter(e => pasa(cursoSesion(e), e[1].grupo, true));
-    ul.innerHTML = ss.length ? ss.map(([code, s]) => `<li class="fila ${cursoDe(cursoSesion([code, s])) ? 'curso-' + cursoSesion([code, s]) : ''}">
+    const ss = sesiones.filter(([, s]) => pasa(cursoSesion(s), s.grupo, true));
+    ul.innerHTML = ss.length ? ss.map(([code, s]) => {
+      const cs = cursoSesion(s);
+      return `<li class="fila tarjeta ${s.endedAt ? 'terminada' : 'en-curso'}">
       <div class="fila-info"><span class="fila-titulo">${esc(s.lessonTitle)}</span>
-        <span class="meta">${filtro === 'todas' || filtro === 'sin' ? chipClase(cursoSesion([code, s]), s.grupo) : ''}${fecha(s.createdAt)}, código ${code}${s.endedAt ? '' : ', <strong class="en-curso">en curso</strong>'}</span></div>
+        <span class="meta">${filtro === 'todas' || filtro === 'sin' ? chipClase(cs, s.grupo) : ''}${fecha(s.createdAt)}, código ${code}</span></div>
       <div class="fila-acc">
-        ${s.endedAt ? '' : `<a class="btn peq primario" href="#/directo/${code}">Volver al directo</a>`}
+        ${s.endedAt ? '' : `<span class="pildora-en-curso">En curso</span><a class="btn peq primario" href="#/directo/${code}">Volver al directo</a>`}
         <a class="btn peq" href="#/informe/${code}">Informe</a>
-      </div></li>`).join('') : `<li class="vacio">${sesiones.length ? 'Aún no has dado clase con este grupo.' : 'Cuando des tu primera clase, aparecerá aquí con su informe.'}</li>`;
+      </div></li>`;
+    }).join('') : `<li class="tarjeta-vacia"><p>${sesiones.length ? 'Aún no has dado clase con este grupo.' : 'Cuando des tu primera clase, aparecerá aquí con su informe.'}</p></li>`;
     $('#mas').hidden = sesiones.length < cuantas;
   }
   const pintarTodo = () => { pintarPestanas(); pintarLecciones(); pintarSesiones(); };
@@ -177,7 +208,9 @@ function vistaInicio() {
     quitarSes?.();
     quitarSes = onValue(query(ref(db, `teacherSessions/${U.uid}`), orderByChild('createdAt'), limitToLast(cuantas)), snap => {
       sesiones = []; snap.forEach(c => { const v = c.val(); delete v.items; sesiones.push([c.key, v]); });
-      sesiones.reverse(); pintarSesiones();
+      sesiones.reverse();
+      if (!cargadas) { cargadas = true; pintarLecciones(); }
+      pintarSesiones();
     });
   };
   escucharSesiones();
@@ -186,15 +219,17 @@ function vistaInicio() {
 
   $('#pestanas').onclick = e => { const b = e.target.closest('[data-filtro]'); if (!b) return; filtro = b.dataset.filtro; guardarFiltro(filtro); pintarTodo(); };
 
-  $('#nueva').onclick = async () => {
+  const nuevaLeccion = async () => {
     const id = nuevoId();
     const l = { title: 'Lección sin título', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
     if (clase()) l.curso = clase().curso;
     await set(ref(db, `lessons/${U.uid}/${id}`), l);
     location.hash = `#/leccion/${id}`;
   };
+  $('#nueva').onclick = nuevaLeccion;
 
   $('.contenido') && (app.querySelector('.contenido').onclick = async e => {
+    if (e.target.closest('[data-nueva]')) return nuevaLeccion();
     const emp = e.target.closest('[data-empezar]');
     if (emp) {
       const c = clase();
@@ -237,7 +272,7 @@ async function empezarClase(lessonId, grupo = '') {
   }
   const curso = cursoDe(l.curso) ? l.curso : '';
   await set(ref(db, `teacherSessions/${U.uid}/${code}`), { lessonId, lessonTitle: l.title, curso, grupo: curso ? grupo : '', createdAt: serverTimestamp(), items });
-  await set(ref(db, `sessions/${code}`), { owner: U.uid, lessonId, lessonTitle: l.title, createdAt: serverTimestamp(), showCode: true, state: estado(items, 0) });
+  await set(ref(db, `sessions/${code}`), { owner: U.uid, lessonId, lessonTitle: l.title, curso, createdAt: serverTimestamp(), showCode: true, state: estado(items, 0) });
   location.hash = `#/directo/${code}`;
 }
 
@@ -283,9 +318,10 @@ async function vistaEditor(id) {
   }
 
   function pintar() {
+    colorCurso(L.curso);
     app.innerHTML = marco(`
-    <section class="editor ${cursoDe(L.curso) ? 'curso-' + L.curso : ''}">
-      <div class="cab-editor">
+    <section class="editor">
+      <div class="cab-editor hero">
         <input id="titulo" class="titulo-input" value="${esc(L.title)}" aria-label="Título de la lección" maxlength="120">
         <select id="curso" class="sel-curso" aria-label="Curso de la lección"><option value="">Sin curso</option>${CURSOS.map(c => `<option value="${c.id}" ${L.curso === c.id ? 'selected' : ''}>${esc(c.nombre)} · ${esc(c.materia)}</option>`).join('')}</select>
         <div class="acciones">
@@ -1052,10 +1088,11 @@ async function vistaDirecto(code) {
   const diapos = (await get(ref(db, `slides/${U.uid}/${priv.lessonId}`))).val() || {};
   const enlace = enlaceAlumno(code);
   let roster = {};
+  colorCurso(priv.curso);
 
   app.innerHTML = marco(`
-  <section class="directo ${cursoDe(priv.curso) ? 'curso-' + priv.curso : ''}">
-    <div class="cab-directo">
+  <section class="directo">
+    <div class="cab-directo hero">
       <div class="cab-titulo"><h1>${esc(priv.lessonTitle)}</h1>${chipClase(priv.curso, priv.grupo)}
         <p class="meta">El alumnado entra en <a href="${enlace}" target="_blank" rel="noopener">${esc(enlaceCorto(enlace))}</a> con el código</p></div>
       <div class="codigo-grande" aria-label="Código de la clase">${code}</div>
@@ -1279,10 +1316,11 @@ async function vistaInforme(code) {
     });
   const participacion = acts.map(it => Object.keys(resp[it.id] || {}).length);
 
+  colorCurso(priv.curso);
   app.innerHTML = marco(`
   <section class="informe">
-    <div class="cab-bloque">
-      <div><h1>${esc(priv.lessonTitle)}</h1>${chipClase(priv.curso, priv.grupo)}<p class="meta">${fecha(priv.createdAt)}, código ${code}, ${filas.length} ${filas.length === 1 ? 'alumno' : 'alumnos'}${priv.endedAt ? '' : ', <strong class="en-curso">en curso</strong>'}</p></div>
+    <div class="cab-bloque hero">
+      <div><h1>${esc(priv.lessonTitle)}</h1>${chipClase(priv.curso, priv.grupo)}<p class="meta">${fecha(priv.createdAt)}, código ${code}, ${filas.length} ${filas.length === 1 ? 'alumno' : 'alumnos'}</p>${priv.endedAt ? '' : '<span class="pildora-en-curso">En curso</span>'}</div>
       <div class="acciones">
         ${priv.endedAt ? '' : `<a class="btn primario" href="#/directo/${code}">Volver al directo</a>`}
         <button class="btn" id="csv">Descargar CSV</button>
@@ -1343,7 +1381,7 @@ async function vistaInforme(code) {
 async function vistaBanco() {
   app.innerHTML = marco(`
   <section class="bloque">
-    <div class="cab-bloque">
+    <div class="cab-bloque hero">
       <div><h1>Banco de preguntas</h1><p class="meta">Guarda aquí las preguntas que quieras reutilizar. Al añadirlas a una lección se copian, así que puedes retocarlas allí sin cambiar el banco.</p></div>
       <div class="acciones">
         <label class="btn">Importar<input type="file" id="importar" accept="application/json,.json" hidden></label>

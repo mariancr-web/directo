@@ -18,11 +18,11 @@ export const TIPOS = {
   link: 'Enlace'
 };
 
-// Cursos de Marián (color = curso, guía de marca v3). En 2.º ESO hay dos grupos
+// Cursos de Marián (color = curso, guía de marca v3). En 2.º y 4.º ESO hay dos grupos
 export const CURSOS = [
   { id: '1eso', nombre: '1.º ESO', materia: 'BioGeo', grupos: [''] },
   { id: '2eso', nombre: '2.º ESO', materia: 'FyQ', grupos: ['A', 'B'] },
-  { id: '4eso', nombre: '4.º ESO', materia: 'FyQ', grupos: [''] },
+  { id: '4eso', nombre: '4.º ESO', materia: 'FyQ', grupos: ['A', 'B'] },
   { id: '1bach', nombre: '1.º Bach', materia: 'FyQ', grupos: [''] },
   { id: '2bach', nombre: '2.º Bach', materia: 'Química', grupos: [''] }
 ];
@@ -554,3 +554,10 @@ export async function reducirImagen(file, max, calidad) {
   } finally { URL.revokeObjectURL(url); }
 }
 
+
+// Color de toda la página según el curso (guía de webs y herramientas)
+export function colorCurso(curso) {
+  const b = document.body;
+  [...b.classList].filter(c => c.startsWith('curso-')).forEach(c => b.classList.remove(c));
+  if (curso && cursoDe(curso)) b.classList.add('curso-' + curso);
+}
