@@ -18,6 +18,18 @@ export const TIPOS = {
   link: 'Enlace'
 };
 
+// Cursos de Marián (color = curso, guía de marca v3). En 2.º ESO hay dos grupos
+export const CURSOS = [
+  { id: '1eso', nombre: '1.º ESO', materia: 'BioGeo', grupos: [''] },
+  { id: '2eso', nombre: '2.º ESO', materia: 'FyQ', grupos: ['A', 'B'] },
+  { id: '4eso', nombre: '4.º ESO', materia: 'FyQ', grupos: [''] },
+  { id: '1bach', nombre: '1.º Bach', materia: 'FyQ', grupos: [''] },
+  { id: '2bach', nombre: '2.º Bach', materia: 'Química', grupos: [''] }
+];
+export const CLASES = CURSOS.flatMap(c => c.grupos.map(g => ({ id: g ? `${c.id}-${g.toLowerCase()}` : c.id, curso: c.id, grupo: g, nombre: c.nombre + (g ? ' ' + g : ''), materia: c.materia })));
+export const cursoDe = id => CURSOS.find(c => c.id === id) || null;
+export const nombreClase = (curso, grupo = '') => { const c = cursoDe(curso); return c ? c.nombre + (grupo ? ' ' + grupo : '') : ''; };
+
 export const nombreTipo = it => (it?.type === 'quiz' && it.poll) ? 'Encuesta' : (TIPOS[it?.type] || '');
 // Las diapositivas y los enlaces no recogen respuestas
 export const esActividad = it => !!it && it.type !== 'slide' && it.type !== 'link';

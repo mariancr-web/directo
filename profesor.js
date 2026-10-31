@@ -2,7 +2,7 @@ import { auth, db, configurado } from './firebase.js';
 import { NOMBRE_APP } from './config.js';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, remove, onValue, serverTimestamp, query, orderByChild, limitToLast } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-import { esc, rico, conDatos, conNombres, TIPOS, nombreTipo, esActividad, esCorregible, itemPublico, comprobar, textoRespuesta, solucionTexto, generarCodigo, nuevoId, parseNum, fecha, evaluar, postsMuro, MAX_MURO, POR_PARTES, pintarPartes, solucionesHuecos, filasTabla, tieneVariantes, valores, datosTexto, fmtNum, infoEnlace, buscarEnlaces, reducirImagen, alternativas, generarSopa, normSopa, pintarSopa } from './lib.js';
+import { esc, rico, conDatos, conNombres, TIPOS, nombreTipo, esActividad, esCorregible, itemPublico, comprobar, textoRespuesta, solucionTexto, generarCodigo, nuevoId, parseNum, fecha, evaluar, postsMuro, MAX_MURO, POR_PARTES, pintarPartes, solucionesHuecos, filasTabla, tieneVariantes, valores, datosTexto, fmtNum, infoEnlace, buscarEnlaces, CURSOS, CLASES, cursoDe, nombreClase, reducirImagen, alternativas, generarSopa, normSopa, pintarSopa } from './lib.js';
 
 const app = document.getElementById('app');
 const dlg = document.getElementById('dlg');
@@ -98,58 +98,111 @@ function router() {
   return vistaInicio();
 }
 
-// ── Inicio: lecciones y clases recientes ─────────────────────────
+// ── Inicio: lecciones y clases, separadas por curso y grupo ─────
+const leerFiltro = () => { try { return localStorage.getItem('cd-clase') || 'todas'; } catch { return 'todas'; } };
+const guardarFiltro = v => { try { localStorage.setItem('cd-clase', v); } catch {} };
+const chipClase = (curso, grupo) => curso && cursoDe(curso) ? `<span class="chip-clase curso-${curso}">${esc(nombreClase(curso, grupo))}</span>` : '';
+
 function vistaInicio() {
+  let filtro = leerFiltro();
+  if (filtro !== 'todas' && filtro !== 'sin' && !CLASES.some(c => c.id === filtro)) filtro = 'todas';
+  let lecciones = [], sesiones = [], cuantas = 40;
   app.innerHTML = marco(`
+  <nav class="pestanas-clase" id="pestanas" aria-label="Clases"></nav>
   <section class="bloque">
-    <div class="cab-bloque"><h1>Tus lecciones</h1><div class="acciones"><a class="btn" href="#/banco">Banco de preguntas</a><button class="btn primario" id="nueva">Nueva lección</button></div></div>
+    <div class="cab-bloque"><h1 id="tit-lecciones">Tus lecciones</h1><div class="acciones"><a class="btn" href="#/banco">Banco de preguntas</a><button class="btn primario" id="nueva">Nueva lección</button></div></div>
     <ul class="lista" id="lecciones"><li class="vacio">Cargando…</li></ul>
   </section>
   <section class="bloque">
-    <h2>Clases recientes</h2>
+    <h2 id="tit-sesiones">Clases dadas</h2>
     <ul class="lista" id="sesiones"><li class="vacio">Cargando…</li></ul>
+    <button class="btn" id="mas" hidden>Ver clases más antiguas</button>
   </section>`);
 
-  $('#nueva').onclick = async () => {
-    const id = nuevoId();
-    await set(ref(db, `lessons/${U.uid}/${id}`), { title: 'Lección sin título', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-    location.hash = `#/leccion/${id}`;
+  const clase = () => CLASES.find(c => c.id === filtro) || null;
+  const cursoLeccion = id => lecciones.find(([k]) => k === id)?.[1].curso || '';
+  // Las clases antiguas no guardaban el curso: se toma el de su lección
+  const cursoSesion = ([, s]) => s.curso ?? cursoLeccion(s.lessonId);
+  const pasa = (curso, grupo, esSesion) => {
+    if (filtro === 'todas') return true;
+    if (filtro === 'sin') return !cursoDe(curso);
+    const c = clase();
+    return curso === c.curso && (!esSesion || (grupo || '') === c.grupo);
   };
 
-  alSalir(onValue(ref(db, `lessons/${U.uid}`), snap => {
+  function pintarPestanas() {
+    const haySin = lecciones.some(([, l]) => !cursoDe(l.curso));
+    const ps = [['todas', 'Todas', 'general'], ...CLASES.map(c => [c.id, c.nombre, c.curso]), ...(haySin ? [['sin', 'Sin curso', '']] : [])];
+    $('#pestanas').innerHTML = ps.map(([id, n, curso]) => `<button type="button" class="pestana ${curso ? 'curso-' + curso : ''}" data-filtro="${id}" aria-pressed="${filtro === id}">${esc(n)}</button>`).join('');
+    const c = clase();
+    $('#tit-lecciones').textContent = c ? `Lecciones de ${cursoDe(c.curso).nombre} · ${c.materia}` : filtro === 'sin' ? 'Lecciones sin curso' : 'Tus lecciones';
+    $('#tit-sesiones').textContent = c ? `Clases dadas en ${c.nombre}` : 'Clases dadas';
+    document.querySelector('.contenido')?.setAttribute('class', `contenido${c ? ' curso-' + c.curso : ''}`);
+  }
+
+  function pintarLecciones() {
     const ul = $('#lecciones'); if (!ul) return;
-    const ls = Object.entries(snap.val() || {}).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+    const ls = lecciones.filter(([, l]) => pasa(l.curso)).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
     ul.innerHTML = ls.length ? ls.map(([id, l]) => {
       const its = l.items || [];
       const nd = its.filter(i => i.type === 'slide').length, na = its.length - nd;
-      return `<li class="fila">
+      return `<li class="fila ${cursoDe(l.curso) ? 'curso-' + l.curso : ''}">
         <div class="fila-info"><a class="fila-titulo" href="#/leccion/${id}">${esc(l.title)}</a>
-          <span class="meta">${nd} ${nd === 1 ? 'diapositiva' : 'diapositivas'} y ${na} ${na === 1 ? 'actividad' : 'actividades'}</span></div>
+          <span class="meta">${filtro === 'todas' ? chipClase(l.curso) : ''}${nd} ${nd === 1 ? 'diapositiva' : 'diapositivas'} y ${na} ${na === 1 ? 'actividad' : 'actividades'}</span></div>
         <div class="fila-acc">
           <a class="btn peq" href="#/leccion/${id}">Editar</a>
-          <button class="btn peq primario" data-empezar="${id}" ${its.length ? '' : 'disabled'}>Empezar clase</button>
+          <button class="btn peq primario" data-empezar="${id}" ${its.length ? '' : 'disabled'}>Empezar clase${clase()?.grupo ? ' con ' + esc(clase().nombre) : ''}</button>
           <button class="btn peq peligro" data-borrar="${id}">Eliminar</button>
         </div></li>`;
-    }).join('') : `<li class="vacio">Aún no tienes lecciones. Crea una y sube tu presentación en PDF.</li>`;
-  }));
+    }).join('') : `<li class="vacio">${lecciones.length ? 'No hay lecciones en esta clase. Crea una con «Nueva lección» o elige el curso dentro de una lección.' : 'Aún no tienes lecciones. Crea una y sube tu presentación en PDF.'}</li>`;
+  }
 
-  alSalir(onValue(query(ref(db, `teacherSessions/${U.uid}`), orderByChild('createdAt'), limitToLast(15)), snap => {
+  function pintarSesiones() {
     const ul = $('#sesiones'); if (!ul) return;
-    const ss = [];
-    snap.forEach(c => { ss.push([c.key, c.val()]); });
-    ss.reverse();
-    ul.innerHTML = ss.length ? ss.map(([code, s]) => `<li class="fila">
+    const ss = sesiones.filter(e => pasa(cursoSesion(e), e[1].grupo, true));
+    ul.innerHTML = ss.length ? ss.map(([code, s]) => `<li class="fila ${cursoDe(cursoSesion([code, s])) ? 'curso-' + cursoSesion([code, s]) : ''}">
       <div class="fila-info"><span class="fila-titulo">${esc(s.lessonTitle)}</span>
-        <span class="meta">${fecha(s.createdAt)}, código ${code}${s.endedAt ? '' : ', <strong class="en-curso">en curso</strong>'}</span></div>
+        <span class="meta">${filtro === 'todas' || filtro === 'sin' ? chipClase(cursoSesion([code, s]), s.grupo) : ''}${fecha(s.createdAt)}, código ${code}${s.endedAt ? '' : ', <strong class="en-curso">en curso</strong>'}</span></div>
       <div class="fila-acc">
         ${s.endedAt ? '' : `<a class="btn peq primario" href="#/directo/${code}">Volver al directo</a>`}
         <a class="btn peq" href="#/informe/${code}">Informe</a>
-      </div></li>`).join('') : `<li class="vacio">Cuando des tu primera clase, aparecerá aquí con su informe.</li>`;
-  }));
+      </div></li>`).join('') : `<li class="vacio">${sesiones.length ? 'Aún no has dado clase con este grupo.' : 'Cuando des tu primera clase, aparecerá aquí con su informe.'}</li>`;
+    $('#mas').hidden = sesiones.length < cuantas;
+  }
+  const pintarTodo = () => { pintarPestanas(); pintarLecciones(); pintarSesiones(); };
+
+  alSalir(onValue(ref(db, `lessons/${U.uid}`), snap => { lecciones = Object.entries(snap.val() || {}); pintarTodo(); }));
+  let quitarSes = null;
+  const escucharSesiones = () => {
+    quitarSes?.();
+    quitarSes = onValue(query(ref(db, `teacherSessions/${U.uid}`), orderByChild('createdAt'), limitToLast(cuantas)), snap => {
+      sesiones = []; snap.forEach(c => { const v = c.val(); delete v.items; sesiones.push([c.key, v]); });
+      sesiones.reverse(); pintarSesiones();
+    });
+  };
+  escucharSesiones();
+  alSalir(() => quitarSes?.());
+  $('#mas').onclick = () => { cuantas += 60; escucharSesiones(); };
+
+  $('#pestanas').onclick = e => { const b = e.target.closest('[data-filtro]'); if (!b) return; filtro = b.dataset.filtro; guardarFiltro(filtro); pintarTodo(); };
+
+  $('#nueva').onclick = async () => {
+    const id = nuevoId();
+    const l = { title: 'Lección sin título', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+    if (clase()) l.curso = clase().curso;
+    await set(ref(db, `lessons/${U.uid}/${id}`), l);
+    location.hash = `#/leccion/${id}`;
+  };
 
   $('.contenido') && (app.querySelector('.contenido').onclick = async e => {
     const emp = e.target.closest('[data-empezar]');
-    if (emp) { emp.disabled = true; emp.textContent = 'Preparando…'; return empezarClase(emp.dataset.empezar); }
+    if (emp) {
+      const c = clase();
+      const grupo = c ? c.grupo : await elegirGrupo(cursoLeccion(emp.dataset.empezar));
+      if (grupo == null) return;
+      emp.disabled = true; emp.textContent = 'Preparando…';
+      return empezarClase(emp.dataset.empezar, grupo);
+    }
     const bor = e.target.closest('[data-borrar]');
     if (bor && confirm('¿Eliminar esta lección y sus diapositivas? Los informes de las clases ya dadas se conservan.')) {
       await remove(ref(db, `slides/${U.uid}/${bor.dataset.borrar}`));
@@ -158,7 +211,22 @@ function vistaInicio() {
   });
 }
 
-async function empezarClase(lessonId) {
+// Si el curso tiene varios grupos (2.º ESO A y B), pregunta con cuál se da la clase. null = cancelar
+function elegirGrupo(curso) {
+  const c = cursoDe(curso);
+  if (!c || c.grupos.length < 2) return Promise.resolve('');
+  return new Promise(ok => {
+    dlg.innerHTML = `<form method="dialog" class="dlg dlg-estrecho curso-${c.id}"><h2>¿Con qué grupo?</h2>
+      <p class="ayuda">La clase y su informe quedarán guardados en ese grupo.</p>
+      <div class="grupos">${c.grupos.map(g => `<button class="btn primario grande" value="${g}">${esc(c.nombre)} ${g}</button>`).join('')}</div>
+      <div class="pie"><button class="btn" value="">Cancelar</button></div></form>`;
+    dlg.onclose = () => { dlg.onclose = null; ok(dlg.returnValue || null); };
+    dlg.returnValue = '';
+    dlg.showModal();
+  });
+}
+
+async function empezarClase(lessonId, grupo = '') {
   const l = (await get(ref(db, `lessons/${U.uid}/${lessonId}`))).val();
   const items = l?.items || [];
   if (!items.length) return alert('Esta lección aún no tiene diapositivas ni actividades.');
@@ -167,7 +235,8 @@ async function empezarClase(lessonId) {
     code = generarCodigo();
     if (!(await get(ref(db, `sessions/${code}`))).exists()) break;
   }
-  await set(ref(db, `teacherSessions/${U.uid}/${code}`), { lessonId, lessonTitle: l.title, createdAt: serverTimestamp(), items });
+  const curso = cursoDe(l.curso) ? l.curso : '';
+  await set(ref(db, `teacherSessions/${U.uid}/${code}`), { lessonId, lessonTitle: l.title, curso, grupo: curso ? grupo : '', createdAt: serverTimestamp(), items });
   await set(ref(db, `sessions/${code}`), { owner: U.uid, lessonId, lessonTitle: l.title, createdAt: serverTimestamp(), showCode: true, state: estado(items, 0) });
   location.hash = `#/directo/${code}`;
 }
@@ -215,9 +284,10 @@ async function vistaEditor(id) {
 
   function pintar() {
     app.innerHTML = marco(`
-    <section class="editor">
+    <section class="editor ${cursoDe(L.curso) ? 'curso-' + L.curso : ''}">
       <div class="cab-editor">
         <input id="titulo" class="titulo-input" value="${esc(L.title)}" aria-label="Título de la lección" maxlength="120">
+        <select id="curso" class="sel-curso" aria-label="Curso de la lección"><option value="">Sin curso</option>${CURSOS.map(c => `<option value="${c.id}" ${L.curso === c.id ? 'selected' : ''}>${esc(c.nombre)} · ${esc(c.materia)}</option>`).join('')}</select>
         <div class="acciones">
           <label class="btn">${Object.keys(diapos).length ? 'Reemplazar PDF' : 'Subir PDF'}<input type="file" id="pdf" accept="application/pdf" hidden></label>
           <button class="btn primario" id="empezar" ${items.length ? '' : 'disabled'}>Empezar clase</button>
@@ -230,7 +300,8 @@ async function vistaEditor(id) {
 
     $('#titulo').onchange = e => { L.title = e.target.value.trim() || 'Lección sin título'; update(lRef, { title: L.title, updatedAt: serverTimestamp() }); };
     $('#pdf').onchange = e => { const f = e.target.files[0]; if (f) procesarPDF(f); };
-    $('#empezar').onclick = e => { e.target.disabled = true; empezarClase(id); };
+    $('#curso').onchange = e => { L.curso = e.target.value; update(lRef, { curso: L.curso || null, updatedAt: serverTimestamp() }); pintar(); };
+    $('#empezar').onclick = async e => { const g = await elegirGrupo(L.curso); if (g == null) return; e.target.disabled = true; empezarClase(id, g); };
     app.querySelector('.editor').onclick = e => {
       const b = e.target.closest('button'); if (!b) return;
       const d = b.dataset;
@@ -950,9 +1021,9 @@ async function vistaDirecto(code) {
   let roster = {};
 
   app.innerHTML = marco(`
-  <section class="directo">
+  <section class="directo ${cursoDe(priv.curso) ? 'curso-' + priv.curso : ''}">
     <div class="cab-directo">
-      <div class="cab-titulo"><h1>${esc(priv.lessonTitle)}</h1>
+      <div class="cab-titulo"><h1>${esc(priv.lessonTitle)}</h1>${chipClase(priv.curso, priv.grupo)}
         <p class="meta">El alumnado entra en <a href="${enlace}" target="_blank" rel="noopener">${esc(enlaceCorto(enlace))}</a> con el código</p></div>
       <div class="codigo-grande" aria-label="Código de la clase">${code}</div>
       <div class="acciones">
@@ -1169,7 +1240,7 @@ async function vistaInforme(code) {
   app.innerHTML = marco(`
   <section class="informe">
     <div class="cab-bloque">
-      <div><h1>${esc(priv.lessonTitle)}</h1><p class="meta">${fecha(priv.createdAt)}, código ${code}, ${filas.length} ${filas.length === 1 ? 'alumno' : 'alumnos'}${priv.endedAt ? '' : ', <strong class="en-curso">en curso</strong>'}</p></div>
+      <div><h1>${esc(priv.lessonTitle)}</h1>${chipClase(priv.curso, priv.grupo)}<p class="meta">${fecha(priv.createdAt)}, código ${code}, ${filas.length} ${filas.length === 1 ? 'alumno' : 'alumnos'}${priv.endedAt ? '' : ', <strong class="en-curso">en curso</strong>'}</p></div>
       <div class="acciones">
         ${priv.endedAt ? '' : `<a class="btn primario" href="#/directo/${code}">Volver al directo</a>`}
         <button class="btn" id="csv">Descargar CSV</button>

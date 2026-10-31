@@ -528,3 +528,37 @@ body.pantalla-completa .muro, body.modo-amplio .muro { columns: 18rem; }
 .sopa-palabras.con-pistas li { border-radius: var(--radio); font-family: var(--f-cuerpo); font-weight: 400; letter-spacing: 0; }
 .sopa-palabras.con-pistas li.hallada { text-decoration: none; }
 @media (min-width: 52rem) { .sopa-caja { grid-template-columns: auto minmax(12rem, 18rem); align-items: start; } .sopa-palabras:not(.con-pistas) { justify-content: start; } }
+
+/* Cursos: color = curso (guía de marca v3). Se aplica a una zona y recolorea sus acentos */
+.curso-general { --acento: #2563EB; --texto: #1D4ED8; --suave: #EFF6FF; }
+.curso-1eso { --acento: #10B981; --texto: #047857; --suave: #ECFDF5; }
+.curso-2eso { --acento: #8B5CF6; --texto: #6D28D9; --suave: #F5F3FF; }
+.curso-4eso { --acento: #F97316; --texto: #C2410C; --suave: #FFF7ED; }
+.curso-1bach { --acento: #06B6D4; --texto: #0E7490; --suave: #ECFEFF; }
+.curso-2bach { --acento: #E11D48; --texto: #BE123C; --suave: #FFF1F2; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .curso-general { --acento: #60A5FA; --texto: #93C5FD; --suave: #172554; }
+  :root:not([data-theme="light"]) .curso-1eso { --acento: #34D399; --texto: #6EE7B7; --suave: #052E1F; }
+  :root:not([data-theme="light"]) .curso-2eso { --acento: #A78BFA; --texto: #C4B5FD; --suave: #2E1065; }
+  :root:not([data-theme="light"]) .curso-4eso { --acento: #FB923C; --texto: #FDBA74; --suave: #431407; }
+  :root:not([data-theme="light"]) .curso-1bach { --acento: #22D3EE; --texto: #67E8F9; --suave: #083344; }
+  :root:not([data-theme="light"]) .curso-2bach { --acento: #FB7185; --texto: #FDA4AF; --suave: #4C0519; }
+}
+:root[data-theme="dark"] .curso-general { --acento: #60A5FA; --texto: #93C5FD; --suave: #172554; }
+:root[data-theme="dark"] .curso-1eso { --acento: #34D399; --texto: #6EE7B7; --suave: #052E1F; }
+:root[data-theme="dark"] .curso-2eso { --acento: #A78BFA; --texto: #C4B5FD; --suave: #2E1065; }
+:root[data-theme="dark"] .curso-4eso { --acento: #FB923C; --texto: #FDBA74; --suave: #431407; }
+:root[data-theme="dark"] .curso-1bach { --acento: #22D3EE; --texto: #67E8F9; --suave: #083344; }
+:root[data-theme="dark"] .curso-2bach { --acento: #FB7185; --texto: #FDA4AF; --suave: #4C0519; }
+.pestanas-clase { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 1.5rem; }
+.pestana { padding: .45rem .9rem; border: 1.5px solid var(--linea); border-left: 5px solid var(--acento); border-radius: var(--radio); background: var(--superficie); color: var(--tinta); font-family: var(--f-marca); font-weight: 600; font-size: .92rem; letter-spacing: .02em; cursor: pointer; }
+.pestana:hover { border-color: var(--acento); }
+.pestana[aria-pressed="true"] { background: var(--acento); border-color: var(--acento); color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pestana[aria-pressed="true"] { color: #0F172A; } }
+:root[data-theme="dark"] .pestana[aria-pressed="true"] { color: #0F172A; }
+.lista .fila[class*="curso-"] { border-left: 4px solid var(--acento); padding-left: .75rem; }
+.chip-clase { display: inline-block; margin-right: .5rem; padding: .05rem .5rem; border-radius: 999px; background: var(--suave); color: var(--texto); font-family: var(--f-marca); font-weight: 600; font-size: .78rem; letter-spacing: .03em; vertical-align: middle; }
+h1 + .chip-clase { margin: 0 0 .4rem; }
+.sel-curso { width: auto; margin: 0; }
+.grupos { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: 1rem 0; }
+.dlg-estrecho { max-width: 26rem; }
