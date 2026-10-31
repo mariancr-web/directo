@@ -2,7 +2,7 @@ import { auth, db, configurado } from './firebase.js';
 import { NOMBRE_APP } from './config.js';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, remove, onValue, serverTimestamp, query, orderByChild, limitToLast } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-import { esc, rico, conDatos, conNombres, TIPOS, nombreTipo, esActividad, esCorregible, itemPublico, comprobar, textoRespuesta, solucionTexto, generarCodigo, nuevoId, parseNum, fecha, evaluar, tieneVariantes, valores, datosTexto, fmtNum, infoEnlace, buscarEnlaces } from './lib.js';
+import { esc, rico, conDatos, conNombres, TIPOS, nombreTipo, esActividad, esCorregible, itemPublico, comprobar, textoRespuesta, solucionTexto, generarCodigo, nuevoId, parseNum, fecha, evaluar, postsMuro, MAX_MURO, POR_PARTES, pintarPartes, solucionesHuecos, filasTabla, tieneVariantes, valores, datosTexto, fmtNum, infoEnlace, buscarEnlaces, reducirImagen, alternativas, generarSopa, normSopa, pintarSopa } from './lib.js';
 
 const app = document.getElementById('app');
 const dlg = document.getElementById('dlg');
@@ -189,6 +189,15 @@ async function vistaEditor(id) {
     let meta = '';
     if (it.type === 'quiz') meta = `${it.options.length} opciones`;
     if (it.type === 'number') meta = tieneVariantes(it) ? `Con datos distintos para cada alumno: ${it.formula}, tolerancia ${it.tolerance}%` : `Solución ${solucionTexto(it)}, tolerancia ${it.tolerance}%`;
+    if (it.type === 'gaps') meta = `${solucionesHuecos(it.text).length} huecos`;
+    if (it.type === 'table') meta = `Tabla de ${filasTabla(it.table).length} filas, ${solucionesHuecos(it.table).length} casillas`;
+    if (it.type === 'match') meta = `${(it.pairs || []).length} parejas`;
+    if (it.type === 'order') meta = `${(it.steps || []).length} elementos`;
+    if (it.type === 'photo') meta = 'Entrega de imagen';
+    if (it.type === 'label') meta = `${(it.points || []).length} partes que identificar${it.write ? ', escribiendo el nombre' : ', eligiendo de una lista'}`;
+    if (it.type === 'memory') meta = `${(it.pairs || []).length} parejas`;
+    if (it.type === 'search') meta = `${(it.words || []).length} palabras${(it.clues || []).some(Boolean) ? ' con pistas' : ''}`;
+    if (it.type === 'wall') meta = `Muro${it.images !== false ? ' con imágenes' : ''}${it.names ? ', con nombres' : ', anónimo'}`;
     if (it.type === 'link') meta = `${it.url}${it.embed ? ' · se ve dentro de la clase' : ' · se abre en otra pestaña'}`;
     if (it.type === 'short') meta = esCorregible(it) ? 'Se corrige sola' : 'Corrección manual';
     if (it.type === 'draw') meta = it.background ? `Sobre la diapositiva ${it.background}` : 'Lienzo en blanco';
@@ -232,8 +241,8 @@ async function vistaEditor(id) {
         const msg = items[i].type === 'slide' ? '¿Quitar esta diapositiva de la lección?' : '¿Eliminar esta actividad?';
         if (confirm(msg)) { items.splice(i, 1); guardar(); pintar(); }
       }
-      if (d.edit) { const i = +d.edit; dialogoActividad(items[i], paginas(), nuevo => { items[i] = nuevo; guardar(); pintar(); }); }
-      if (d.add !== undefined) { const i = +d.add; dialogoActividad(null, paginas(), (...nuevos) => { items.splice(i + 1, 0, ...nuevos); guardar(); pintar(); }); }
+      if (d.edit) { const i = +d.edit; dialogoActividad(items[i], paginas(), nuevo => { items[i] = nuevo; guardar(); pintar(); }, { diapos }); }
+      if (d.add !== undefined) { const i = +d.add; dialogoActividad(null, paginas(), (...nuevos) => { items.splice(i + 1, 0, ...nuevos); guardar(); pintar(); }, { diapos }); }
     };
   }
 
@@ -321,7 +330,16 @@ const DESCRIPCION = {
   quiz: 'Varias opciones, con o sin respuesta correcta',
   short: 'El alumnado escribe un texto breve',
   number: 'Un valor numérico, con unidad y tolerancia. Puede llevar datos distintos para cada alumno',
-  draw: 'Dibujan en blanco o sobre una diapositiva'
+  draw: 'Dibujan en blanco o sobre una diapositiva',
+  gaps: 'Un texto con huecos que completan',
+  match: 'Relacionan cada elemento con su pareja',
+  order: 'Colocan pasos o elementos en el orden correcto',
+  table: 'Una tabla con casillas para completar',
+  photo: 'Suben una foto o imagen, con un comentario',
+  wall: 'Todos publican textos o imágenes en un muro común',
+  label: 'Ponen nombre a las partes numeradas de una imagen',
+  memory: 'Juego de memoria: encuentran las parejas de cartas',
+  search: 'Buscan palabras en una sopa de letras'
 };
 
 // Atajos para escribir fórmulas. ‸ marca dónde queda el cursor
@@ -339,7 +357,8 @@ function dialogoActividad(item, paginas, alGuardar, opciones = {}) {
   function elegirTipo() {
     dlg.innerHTML = `<form method="dialog" class="dlg">
       <h2>Nueva actividad</h2>
-      <div class="tipos">${['quiz', 'short', 'number', 'draw'].map(t => `<button type="button" class="tipo-btn" data-t="${t}"><strong>${TIPOS[t]}</strong><span>${DESCRIPCION[t]}</span></button>`).join('')}
+      ${opciones.directo ? '<p class="ayuda">Se añade justo después del paso actual, solo en esta clase. Si quieres conservarla, marca «Guardar también en el banco».</p>' : ''}
+      <div class="tipos">${['quiz', 'short', 'number', 'draw', 'gaps', 'match', 'order', 'table', 'label', 'memory', 'search', 'photo', 'wall'].map(t => `<button type="button" class="tipo-btn" data-t="${t}"><strong>${TIPOS[t]}</strong><span>${DESCRIPCION[t]}</span></button>`).join('')}
         ${enBanco ? '' : `<button type="button" class="tipo-btn" id="enlace"><strong>Enlace</strong><span>Una actividad de otra web: Wordwall, Genially, YouTube, GeoGebra…</span></button>
         <button type="button" class="tipo-btn tipo-banco" id="desde-banco"><strong>Desde el banco</strong><span>Reutiliza preguntas que ya tienes guardadas</span></button>`}</div>
       <div class="pie"><button class="btn" value="cancel">Cancelar</button></div></form>`;
@@ -394,6 +413,49 @@ function dialogoActividad(item, paginas, alGuardar, opciones = {}) {
         <span class="ayuda ayuda-sol">Con datos, la solución es una fórmula: <code>c*V/1000</code>, <code>sqrt(2*g*h)</code>, <code>-log(c)</code> (log en base 10, ln natural).</span>
         <label class="check"><input type="checkbox" id="pedir" ${base.unitMode === 'ask' ? 'checked' : ''}> El alumnado debe escribir la unidad (si no, la ve junto a la casilla)</label>`;
     }
+    const mayus = `<label class="check"><input type="checkbox" id="mayus" ${base.caseSensitive ? 'checked' : ''}> Distinguir mayúsculas (por ejemplo, en fórmulas: CO no es Co)</label>`;
+    if (t === 'gaps') {
+      campos = `<label>Texto con huecos<textarea id="texto-act" rows="5" maxlength="3000" spellcheck="false">${esc(base.text || '')}</textarea>
+        <span class="ayuda">Escribe la respuesta de cada hueco entre dobles corchetes: <code>El agua hierve a [[100]] °C</code>. Si valen varias, sepáralas con |: <code>[[evaporación|vaporización]]</code>. Admite fórmulas.</span></label>${mayus}`;
+    }
+    if (t === 'table') {
+      campos = `<label>Tabla<textarea id="texto-act" rows="6" maxlength="4000" spellcheck="false" placeholder="Fórmula | Nombre&#10;$\\ce{CO2}$ | [[dióxido de carbono]]&#10;[[CH4]] | metano">${esc(base.table || '')}</textarea>
+        <span class="ayuda">Una fila por línea y las celdas separadas por |. La primera fila es la cabecera. Las casillas que deben completar van entre dobles corchetes: <code>[[metano]]</code>.</span></label>${mayus}`;
+    }
+    if (t === 'match') {
+      campos = `<label>Parejas<textarea id="texto-act" rows="6" maxlength="3000" spellcheck="false" placeholder="$\\ce{NaCl}$ | cloruro de sodio&#10;$\\ce{H2SO4}$ | ácido sulfúrico">${esc((base.pairs || []).map(p => p.join(' | ')).join('\n'))}</textarea>
+        <span class="ayuda">Una pareja por línea, separada por |. A la derecha aparecerán desordenadas.</span></label>`;
+    }
+    if (t === 'order') {
+      campos = `<label>Elementos en el orden correcto<textarea id="texto-act" rows="6" maxlength="3000">${esc((base.steps || []).join('\n'))}</textarea>
+        <span class="ayuda">Uno por línea, en el orden bueno. El alumnado los verá desordenados.</span></label>`;
+    }
+    if (t === 'memory') {
+      campos = `<label>Parejas de cartas<textarea id="texto-act" rows="6" maxlength="2000" spellcheck="false" placeholder="$\\ce{CH4}$ | metano&#10;$\\ce{C2H6}$ | etano">${esc((base.pairs || []).map(p => p.join(' | ')).join('\n'))}</textarea>
+        <span class="ayuda">Una pareja por línea, separada por |: fórmula y nombre, concepto y definición… Entre 2 y 10 parejas. Ganan cuando las encuentran todas; se guardan los intentos.</span></label>`;
+    }
+    if (t === 'search') {
+      campos = `<label>Palabras<textarea id="texto-act" rows="6" maxlength="2000" spellcheck="false" placeholder="carbono&#10;alcano | Hidrocarburo con solo enlaces simples">${esc((base.words || []).map((w, i) => base.clues?.[i] ? `${w} | ${base.clues[i]}` : w).join('\n'))}</textarea>
+        <span class="ayuda">Una por línea (entre 3 y 14 letras; las tildes se quitan, la ñ se mantiene). Si después de | escribes una pista, el alumnado verá las pistas en lugar de las palabras.</span></label>
+        <label class="check"><input type="checkbox" id="inversas" ${base.reverse ? 'checked' : ''}> Más difícil: también palabras al revés</label>
+        <button type="button" class="btn peq" id="otra-sopa">Generar otra sopa</button>`;
+    }
+    if (t === 'label') {
+      const pags = opciones.diapos ? paginas.filter(p => opciones.diapos[p]) : [];
+      campos = `<fieldset class="opciones"><legend>Imagen</legend>
+        <div class="fila-botones">${pags.length ? `<label>Usar una diapositiva<select id="fondo-et"><option value="">Elige…</option>${pags.map(p => `<option value="${p}">Diapositiva ${p}</option>`).join('')}</select></label>` : ''}
+          <label class="btn elegir-foto">Subir una imagen<input type="file" id="img-et" accept="image/*" hidden></label></div>
+        <div class="img-etiquetas editor-etiquetas" id="lienzo-et"></div>
+        <p class="ayuda" id="ayuda-et"></p>
+        <ol class="lista-etiquetas" id="puntos-et"></ol></fieldset>
+        <label class="check"><input type="checkbox" id="escribir" ${base.write ? 'checked' : ''}> Que escriban el nombre (si no, lo eligen de una lista)</label>
+        <span class="ayuda">Si escriben, puedes aceptar varias respuestas separándolas con |: <code>mitocondria|mitocondrias</code>.</span>${mayus}`;
+    }
+    if (t === 'wall') {
+      campos = `<label class="check"><input type="checkbox" id="imgs" ${base.images !== false ? 'checked' : ''}> Pueden añadir una imagen a cada aportación</label>
+        <label class="check"><input type="checkbox" id="nombres" ${base.names ? 'checked' : ''}> Mostrar el nombre de cada alumno en el muro (si no, es anónimo para la clase)</label>
+        <span class="ayuda">Cada alumno puede publicar hasta ${MAX_MURO} aportaciones. El muro se ve en el proyector mientras lo van rellenando, y puedes ocultar cualquier aportación.</span>`;
+    }
     if (t === 'draw' && !enBanco) {
       campos = `<label>Fondo<select id="fondo"><option value="">Lienzo en blanco</option>${paginas.map(p => `<option value="${p}" ${Number(base.background) === p ? 'selected' : ''}>Diapositiva ${p}</option>`).join('')}</select></label>`;
     }
@@ -407,7 +469,8 @@ function dialogoActividad(item, paginas, alGuardar, opciones = {}) {
       <h2>${item ? 'Editar' : 'Nueva'} ${enBanco ? 'pregunta' : 'actividad'}: ${TIPOS[t]}</h2>
       <label for="enun">Enunciado</label>
       <div class="atajos" role="toolbar" aria-label="Insertar fórmulas">${ATAJOS.map(([n, x]) => `<button type="button" class="btn peq" data-atajo="${esc(x)}">${esc(n)}</button>`).join('')}
-        ${t === 'number' ? '<button type="button" class="btn peq" data-atajo="{{‸}}">Dato</button>' : ''}</div>
+        ${t === 'number' ? '<button type="button" class="btn peq" data-atajo="{{‸}}">Dato</button>' : ''}
+        ${t === 'gaps' || t === 'table' ? '<button type="button" class="btn peq" data-atajo="[[‸]]">Hueco</button>' : ''}</div>
       <textarea id="enun" rows="3" maxlength="1000" required>${esc(base.prompt || '')}</textarea>
       <span class="ayuda">${AYUDA_FORMULAS}</span>
       <div class="vista-previa" id="vista" aria-live="polite"></div>
@@ -418,7 +481,7 @@ function dialogoActividad(item, paginas, alGuardar, opciones = {}) {
 
     const q = s => dlg.querySelector(s);
     ultimoCampo = q('#enun');
-    dlg.querySelector('form').addEventListener('focusin', e => { if (e.target.matches('#enun, .op-txt')) ultimoCampo = e.target; });
+    dlg.querySelector('form').addEventListener('focusin', e => { if (e.target.matches('#enun, .op-txt, #texto-act')) ultimoCampo = e.target; });
     q('.atajos').onclick = e => {
       const b = e.target.closest('[data-atajo]'); if (!b) return;
       const c = ultimoCampo || q('#enun');
@@ -452,6 +515,40 @@ function dialogoActividad(item, paginas, alGuardar, opciones = {}) {
         vistaPrevia();
       };
     }
+    // Identificar en imagen: la docente pulsa sobre la imagen para numerar las partes
+    let imgEt = base.image || '';
+    const puntos = (base.points || []).map(p => ({ ...p }));
+    const pintarEt = () => {
+      q('#lienzo-et').innerHTML = imgEt
+        ? `<img src="${esc(imgEt)}" alt="Imagen de la actividad">${puntos.map((p, i) => `<span class="marca-img" style="left:${p.x}%;top:${p.y}%">${i + 1}</span>`).join('')}`
+        : '<p class="vacio">Elige una diapositiva o sube una imagen.</p>';
+      q('#ayuda-et').textContent = imgEt ? 'Pulsa sobre la imagen en cada parte que deban identificar y escribe debajo su nombre.' : '';
+      q('#puntos-et').innerHTML = puntos.map((p, i) => `<li><span class="marca-num">${i + 1}</span><input class="et-txt" data-i="${i}" value="${esc(p.t || '')}" placeholder="Nombre de la parte ${i + 1}" maxlength="120"><button type="button" class="btn-ico" data-quitar-et="${i}" aria-label="Quitar la parte ${i + 1}">×</button></li>`).join('');
+    };
+    if (t === 'label') {
+      pintarEt();
+      q('#lienzo-et').onclick = e => {
+        const img = e.target.closest('#lienzo-et')?.querySelector('img'); if (!img) return;
+        const r = img.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+        if (puntos.length >= 15) { q('#err').textContent = 'Como mucho, 15 partes por imagen.'; return; }
+        puntos.push({ x: Math.round((e.clientX - r.left) * 1000 / r.width) / 10, y: Math.round((e.clientY - r.top) * 1000 / r.height) / 10, t: '' });
+        pintarEt();
+        q(`.et-txt[data-i="${puntos.length - 1}"]`).focus();
+      };
+      q('#puntos-et').oninput = e => { const i = e.target.dataset.i; if (i != null) puntos[i].t = e.target.value; };
+      q('#puntos-et').onclick = e => { const b = e.target.closest('[data-quitar-et]'); if (b) { puntos.splice(Number(b.dataset.quitarEt), 1); pintarEt(); vistaPrevia(); } };
+      const fs = q('#fondo-et');
+      if (fs) fs.onchange = () => { if (fs.value) { imgEt = opciones.diapos[fs.value]; pintarEt(); vistaPrevia(); } };
+      q('#img-et').onchange = async e => {
+        const f = e.target.files[0]; if (!f) return;
+        try { imgEt = await reducirImagen(f, 1280, 0.75); if (fs) fs.value = ''; pintarEt(); vistaPrevia(); }
+        catch (err) { console.error(err); q('#err').textContent = 'No se ha podido leer esa imagen.'; }
+      };
+    }
+    // Sopa de letras: se genera al guardar las palabras y se conserva hasta que cambien
+    let sopa = base.grid ? { clave: JSON.stringify([(base.words || []).map(normSopa), !!base.reverse]), grid: base.grid, placed: base.placed } : null;
+    if (t === 'search') q('#otra-sopa').onclick = () => { sopa = null; vistaPrevia(); };
     const chk = q('#al-banco');
     if (chk) chk.onchange = () => { q('.tema-banco').hidden = !chk.checked; };
     temasBanco().then(ts => { const dl = q('#temas-banco'); if (dl) dl.innerHTML = ts.map(x => `<option value="${esc(x)}">`).join(''); });
@@ -509,6 +606,60 @@ function dialogoActividad(item, paginas, alGuardar, opciones = {}) {
           out.answer = x;
         }
       }
+      if (t === 'gaps' || t === 'table') {
+        const txt = q('#texto-act').value.replace(/\r/g, '').trim();
+        if (t === 'gaps') out.text = txt; else out.table = txt;
+        out.caseSensitive = q('#mayus').checked;
+        const sols = solucionesHuecos(txt);
+        if (!sols.length) return { out, error: 'Marca al menos un hueco con dobles corchetes: [[respuesta]].' };
+        if (sols.some(x => !x.length)) return { out, error: 'Hay un hueco vacío: escribe la respuesta dentro de [[ ]].' };
+        if (t === 'table' && filasTabla(txt).length < 2) return { out, error: 'La tabla necesita la fila de cabecera y al menos otra fila.' };
+      }
+      if (t === 'match') {
+        const lineas = q('#texto-act').value.split('\n').map(l => l.trim()).filter(Boolean);
+        out.pairs = lineas.map(l => { const k = l.indexOf('|'); return k < 0 ? [l, ''] : [l.slice(0, k).trim(), l.slice(k + 1).trim()]; });
+        if (out.pairs.length < 2) return { out, error: 'Escribe al menos dos parejas, una por línea.' };
+        if (out.pairs.some(p => !p[0] || !p[1])) return { out, error: 'Cada línea necesita sus dos partes separadas por |.' };
+        if (new Set(out.pairs.map(p => p[1])).size < out.pairs.length) return { out, error: 'Hay dos parejas con la misma parte derecha: cámbiala para que no haya dudas.' };
+      }
+      if (t === 'order') {
+        out.steps = q('#texto-act').value.split('\n').map(l => l.trim()).filter(Boolean);
+        if (out.steps.length < 2) return { out, error: 'Escribe al menos dos elementos, uno por línea.' };
+        if (new Set(out.steps).size < out.steps.length) return { out, error: 'Hay dos elementos iguales: cámbialos para que el orden no sea ambiguo.' };
+      }
+      if (t === 'wall') { out.images = q('#imgs').checked; out.names = q('#nombres').checked; }
+      if (t === 'memory') {
+        const lineas = q('#texto-act').value.split('\n').map(l => l.trim()).filter(Boolean);
+        out.pairs = lineas.map(l => { const k = l.indexOf('|'); return k < 0 ? [l, ''] : [l.slice(0, k).trim(), l.slice(k + 1).trim()]; });
+        if (out.pairs.length < 2) return { out, error: 'Escribe al menos dos parejas, una por línea.' };
+        if (out.pairs.length > 10) return { out, error: 'Como mucho, 10 parejas (20 cartas).' };
+        if (out.pairs.some(p => !p[0] || !p[1])) return { out, error: 'Cada línea necesita sus dos partes separadas por |.' };
+      }
+      if (t === 'search') {
+        const lineas = q('#texto-act').value.split('\n').map(l => l.trim()).filter(Boolean);
+        out.words = []; out.clues = [];
+        for (const l of lineas) { const k = l.indexOf('|'); out.words.push((k < 0 ? l : l.slice(0, k)).trim()); out.clues.push(k < 0 ? '' : l.slice(k + 1).trim()); }
+        if (!out.clues.some(Boolean)) delete out.clues;
+        out.reverse = q('#inversas').checked;
+        const norm = out.words.map(normSopa);
+        if (norm.length < 2) return { out, error: 'Escribe al menos dos palabras, una por línea.' };
+        if (norm.length > 15) return { out, error: 'Como mucho, 15 palabras.' };
+        const mal = out.words.find((w, i) => norm[i].length < 3 || norm[i].length > 14);
+        if (mal != null) return { out, error: `«${mal}» debe tener entre 3 y 14 letras.` };
+        if (new Set(norm).size < norm.length) return { out, error: 'Hay palabras repetidas.' };
+        const clave = JSON.stringify([norm, out.reverse]);
+        if (sopa?.clave !== clave) { const g = generarSopa(out.words, { inversas: out.reverse }); if (!g) return { out, error: 'No caben todas las palabras: quita alguna o acórtalas.' }; sopa = { clave, ...g }; }
+        out.grid = sopa.grid; out.placed = sopa.placed;
+      }
+      if (t === 'label') {
+        if (!imgEt) return { out, error: 'Elige una diapositiva o sube una imagen.' };
+        out.image = imgEt;
+        out.points = puntos.map(p => ({ x: p.x, y: p.y, t: String(p.t || '').trim() }));
+        out.write = q('#escribir').checked;
+        out.caseSensitive = q('#mayus').checked;
+        if (!out.points.length) return { out, error: 'Pulsa sobre la imagen para marcar al menos una parte.' };
+        if (out.points.some(p => !alternativas(p.t).length)) return { out, error: 'Escribe el nombre de cada parte marcada.' };
+      }
       if (t === 'draw' && !enBanco) { const f = q('#fondo').value; if (f) out.background = Number(f); }
       const tema = q('#tema')?.value.trim(); if (tema) out.tema = tema;
       return { out };
@@ -520,6 +671,9 @@ function dialogoActividad(item, paginas, alGuardar, opciones = {}) {
       if (!out) { el.innerHTML = ''; return; }
       let html = `<p class="tipo">Así lo verá un alumno${tieneVariantes(out) ? ' (ejemplo con datos al azar)' : ''}</p><p class="enunciado-previa">${rico(conDatos(out.prompt, out, 'ejemplo'))}</p>`;
       if (t === 'quiz') html += `<ol class="ops-previa">${out.options.map((o, i) => `<li class="${!out.poll && out.correct === i ? 'correcta' : ''}">${rico(o) || '…'}</li>`).join('')}</ol>`;
+      if (t === 'search' && !error) html += `<div class="previa-partes">${pintarSopa(out, [], { conSolucion: true })}</div><p class="meta">Las palabras están marcadas con borde para que veas dónde quedan; el alumnado no lo ve.</p>`;
+      if (t === 'memory' && !error) html += `<p class="meta">${out.pairs.length * 2} cartas, que se barajan para cada alumno.</p>`;
+      if (POR_PARTES.includes(t) && t !== 'label' && !error) html += `<div class="previa-partes">${pintarPartes(itemPublico(out), [], { editable: true })}</div>`;
       if (t === 'number' && !error) {
         html += `<p class="meta">Solución${tieneVariantes(out) ? ' para este alumno' : ''}: <strong>${esc(solucionTexto(out, 'ejemplo'))}</strong></p>`;
         if (out.aviso) html += `<p class="aviso">${esc(out.aviso)}</p>`;
@@ -660,13 +814,29 @@ function dialogoEnlacesPDF(encontrados, alAceptar) {
 }
 
 // ── Resultados (compartido por control y proyector) ──────────────
-function agregados(it, resp) {
+function agregados(it, resp, ocultas) {
   const rs = Object.entries(resp || {});
+  // El alumnado ve el muro en texto (las imágenes, solo en el proyector)
+  if (it.type === 'wall') return { total: rs.length, posts: postsMuro(resp, ocultas).filter(p => p.t).map(p => it.names ? { t: p.t, a: p.alias } : { t: p.t }) };
   if (it.type === 'quiz') return { counts: it.options.map((_, i) => rs.filter(([, r]) => Number(r.value) === i).length) };
   return { total: rs.length, ok: rs.filter(([u, r]) => comprobar(it, r.value, u) === true).length };
 }
 
-function resultadosHTML(it, resp, { vista, revelado = false }) {
+function muroHTML(it, resp, ocultas, { vista }) {
+  const posts = postsMuro(resp, vista === 'profesor' ? {} : ocultas);
+  const n = Object.keys(resp || {}).length;
+  return `<p class="recuento"><strong>${n}</strong> ${n === 1 ? 'alumno ha participado' : 'alumnos han participado'}</p>
+    <div class="muro">${posts.map(p => {
+      const oculta = !!ocultas?.[p.id];
+      return `<figure class="nota ${oculta ? 'oculta' : ''}">${p.img ? `<button type="button" class="ver-dibujo" data-src="${esc(p.img)}"><img src="${esc(p.img)}" alt="Imagen del muro" loading="lazy"></button>` : ''}
+        ${p.t ? `<p>${rico(p.t)}</p>` : ''}
+        ${vista === 'profesor' || it.names ? `<figcaption>${esc(p.alias)}</figcaption>` : ''}
+        ${vista === 'profesor' ? `<button type="button" class="btn peq" data-ocultar="${esc(p.id)}">${oculta ? 'Mostrar' : 'Ocultar'}</button>` : ''}</figure>`;
+    }).join('') || '<p class="vacio">Aún no hay aportaciones.</p>'}</div>`;
+}
+
+function resultadosHTML(it, resp, { vista, revelado = false, ocultas = {} }) {
+  if (it.type === 'wall') return muroHTML(it, resp, ocultas, { vista });
   const entradas = Object.entries(resp || {}).sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
   const n = entradas.length;
   const cab = `<p class="recuento"><strong>${n}</strong> ${n === 1 ? 'respuesta' : 'respuestas'}</p>`;
@@ -683,11 +853,18 @@ function resultadosHTML(it, resp, { vista, revelado = false }) {
     }).join('')}</ul>`;
   }
   if (!detalle) return cab;
-  if (it.type === 'draw') {
-    return cab + `<div class="galeria">${entradas.map(([, r]) => `<figure><button type="button" class="ver-dibujo" data-src="${esc(r.value)}"><img src="${esc(r.value)}" alt="Dibujo${conNombre ? ' de ' + esc(r.alias) : ''}" loading="lazy"></button>${conNombre ? `<figcaption>${esc(r.alias)}</figcaption>` : ''}</figure>`).join('')}</div>`;
+  if (it.type === 'draw' || it.type === 'photo') {
+    return cab + `<div class="galeria">${entradas.map(([, r]) => {
+      const src = it.type === 'photo' ? r.value?.img : r.value;
+      const pie = [conNombre ? esc(r.alias) : '', it.type === 'photo' && r.value?.t ? esc(r.value.t) : ''].filter(Boolean).join('<br>');
+      return `<figure><button type="button" class="ver-dibujo" data-src="${esc(src)}"><img src="${esc(src)}" alt="${it.type === 'photo' ? 'Imagen' : 'Dibujo'}${conNombre ? ' de ' + esc(r.alias) : ''}" loading="lazy"></button>${pie ? `<figcaption>${pie}</figcaption>` : ''}</figure>`;
+    }).join('')}</div>`;
   }
   const ag = agregados(it, resp);
-  const resumen = esCorregible(it)
+  const intentos = it.type === 'memory' ? entradas.map(([, r]) => r.value?.intentos).filter(Boolean) : [];
+  const resumen = it.type === 'memory'
+    ? `<p class="resumen-ok">${ag.ok} de ${n} lo han completado${intentos.length ? `. Media: ${fmtNum(intentos.reduce((a, b) => a + b, 0) / intentos.length, 2)} intentos; mejor: ${Math.min(...intentos)}` : ''}</p>`
+    : esCorregible(it)
     ? `<p class="resumen-ok">${ag.ok} de ${n} ${n === 1 ? 'correcta' : 'correctas'}${it.type === 'number' ? `. Solución: ${esc(solucionTexto(it))}` : ''}</p>` : '';
   const variantes = tieneVariantes(it);
   return cab + resumen + `<ul class="respuestas">${entradas.map(([u, r]) => {
@@ -713,7 +890,7 @@ function controlSesion(code, items, alCambiar) {
   const sincronizar = () => {
     const st = ses?.state; if (!st?.reveal) return;
     const it = items[idx()]; if (!esActividad(it)) return;
-    const ag = agregados(it, resp);
+    const ag = agregados(it, resp, ses?.hidden?.[it.id]);
     if (JSON.stringify(ag) !== JSON.stringify(st.results || null)) set(ref(db, `sessions/${code}/state/results`), ag);
   };
   alSalir(onValue(ref(db, `sessions/${code}`), s => {
@@ -729,6 +906,13 @@ function controlSesion(code, items, alCambiar) {
     alCambiar('sesion');
   }));
   alSalir(() => itemSub && itemSub());
+  // Las actividades añadidas durante el directo llegan a todas las ventanas (control y proyector)
+  alSalir(onValue(ref(db, `teacherSessions/${U.uid}/${code}/items`), s => {
+    const nuevos = s.val() || [];
+    if (JSON.stringify(nuevos) === JSON.stringify(items)) return;
+    items.splice(0, items.length, ...nuevos);
+    alCambiar('items');
+  }));
   document.onkeydown = e => {
     if (e.target.closest('input, textarea, select') || dlg.open) return;
     if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); ir(idx() + 1); }
@@ -736,11 +920,21 @@ function controlSesion(code, items, alCambiar) {
   };
   return {
     get ses() { return ses; }, get resp() { return resp; }, idx, ir,
+    get ocultas() { return ses?.hidden?.[items[idx()]?.id] || {}; },
+    ocultar: id => { const it = items[idx()]; const ya = !!ses?.hidden?.[it.id]?.[id]; set(ref(db, `sessions/${code}/hidden/${it.id}/${id}`), ya ? null : true); },
+    // Inserta pasos tras el actual, en esta clase, y va al primero
+    insertar: async nuevos => {
+      const i = idx();
+      const lista = [...items.slice(0, i + 1), ...nuevos, ...items.slice(i + 1)];
+      await set(ref(db, `teacherSessions/${U.uid}/${code}/items`), lista);
+      if (JSON.stringify(lista) !== JSON.stringify(items)) { items.splice(0, items.length, ...lista); alCambiar('items'); }
+      ir(i + 1);
+    },
     abrir: () => update(ref(db, `sessions/${code}/state`), { open: !ses.state.open }),
     revelar: () => {
       const it = items[idx()];
       if (ses.state.reveal) update(ref(db, `sessions/${code}/state`), { reveal: false, item: itemPublico(it), results: null });
-      else update(ref(db, `sessions/${code}/state`), { reveal: true, item: it, results: agregados(it, resp) });
+      else update(ref(db, `sessions/${code}/state`), { reveal: true, item: it, results: agregados(it, resp, ses?.hidden?.[it.id]) });
     }
   };
 }
@@ -780,7 +974,8 @@ async function vistaDirecto(code) {
   </section>`);
 
   const C = controlSesion(code, items, motivo => {
-    if (motivo === 'sesion') { pintarControles(); pintarTira(); }
+    if (motivo === 'items') { const t = $('#tira'); if (t) t.dataset.hecha = ''; }
+    if (motivo === 'sesion' || motivo === 'items') { pintarControles(); pintarTira(); }
     pintarActual(); pintarRoster();
   });
 
@@ -805,7 +1000,7 @@ async function vistaDirecto(code) {
     const st = C.ses.state || {};
     el.innerHTML = `<div class="act-prof">
       <p class="tipo">${nombreTipo(it)}${st.open ? ' <span class="etiqueta abierta">abierta</span>' : ' <span class="etiqueta">cerrada</span>'}${st.reveal ? ' <span class="etiqueta">resultados visibles</span>' : ''}</p>
-      <h2 class="enunciado">${rico(conNombres(it.prompt, it))}</h2>${resultadosHTML(it, C.resp, { vista: 'profesor' })}</div>`;
+      <h2 class="enunciado">${rico(conNombres(it.prompt, it))}</h2>${resultadosHTML(it, C.resp, { vista: 'profesor', ocultas: C.ocultas })}</div>`;
   }
 
   function pintarControles() {
@@ -815,6 +1010,7 @@ async function vistaDirecto(code) {
       <button class="btn" data-ir="${i - 1}" ${i === 0 || fin ? 'disabled' : ''}>Anterior</button>
       <span class="posicion">${i + 1} de ${items.length}</span>
       <button class="btn primario" data-ir="${i + 1}" ${i >= items.length - 1 || fin ? 'disabled' : ''}>Siguiente</button>
+      ${fin ? '' : '<button class="btn" id="insertar">Añadir actividad aquí</button>'}
       ${esActividad(it) && !fin ? `<span class="sep" aria-hidden="true"></span>
         <button class="btn" id="abrir">${st.open ? 'Cerrar respuestas' : 'Abrir respuestas'}</button>
         <button class="btn" id="revelar">${st.reveal ? 'Ocultar resultados' : 'Mostrar resultados a la clase'}</button>` : ''}
@@ -862,6 +1058,11 @@ async function vistaDirecto(code) {
   app.querySelector('.directo').onclick = async e => {
     const irB = e.target.closest('[data-ir]'); if (irB) return C.ir(Number(irB.dataset.ir));
     if (e.target.closest('#abrir')) return C.abrir();
+    const oc = e.target.closest('[data-ocultar]'); if (oc) return C.ocultar(oc.dataset.ocultar);
+    if (e.target.closest('#insertar')) {
+      const paginas = Object.keys(diapos).filter(k => diapos[k]).map(Number).sort((a, b) => a - b);
+      return dialogoActividad(null, paginas, (...nuevos) => C.insertar(nuevos), { directo: true, diapos });
+    }
     if (e.target.closest('#revelar')) return C.revelar();
     const vd = e.target.closest('.ver-dibujo'); if (vd) return verDibujo(vd.dataset.src);
     if (e.target.closest('#vercodigo')) return update(ref(db, `sessions/${code}`), { showCode: !C.ses.showCode });
@@ -934,7 +1135,7 @@ async function vistaProyector(code) {
       return;
     }
     el.dataset.k = '';
-    el.innerHTML = `<div class="proy-act"><h2>${rico(conNombres(it.prompt, it))}</h2>${resultadosHTML(it, C.resp, { vista: 'proyector', revelado: !!ses.state?.reveal })}</div>`;
+    el.innerHTML = `<div class="proy-act"><h2>${rico(conNombres(it.prompt, it))}</h2>${resultadosHTML(it, C.resp, { vista: 'proyector', revelado: !!ses.state?.reveal, ocultas: C.ocultas })}</div>`;
   }
 }
 
@@ -959,7 +1160,7 @@ async function vistaInforme(code) {
         if (!x) return null;
         const c = comprobar(it, x.value, u);
         if (c === true) ok++;
-        return { c, t: textoRespuesta(it, x.value), dibujo: it.type === 'draw' ? x.value : null, datos: tieneVariantes(it) ? `${datosTexto(it, u)}; solución ${solucionTexto(it, u)}` : '' };
+        return { c, t: textoRespuesta(it, x.value), dibujo: it.type === 'draw' ? x.value : it.type === 'photo' ? x.value?.img : null, verTxt: it.type === 'photo' ? 'Ver imagen' : 'Ver dibujo', datos: tieneVariantes(it) ? `${datosTexto(it, u)}; solución ${solucionTexto(it, u)}` : '' };
       });
       return { r, celdas, ok };
     });
@@ -984,7 +1185,7 @@ async function vistaInforme(code) {
       <tbody>${filas.map(f => `<tr>
         <th scope="row">${esc(f.r.alias)}</th><td>${f.r.email ? esc(f.r.email) : '<span class="sin">Sin cuenta</span>'}</td><td>${fecha(f.r.joinedAt)}</td><td class="num">${f.r.awayCount || 0}</td>
         ${f.celdas.map(c => !c ? '<td class="sin">Sin respuesta</td>'
-          : c.dibujo ? `<td><button class="btn peq ver-dibujo" data-src="${esc(c.dibujo)}">Ver dibujo</button></td>`
+          : c.dibujo ? `<td><button class="btn peq ver-dibujo" data-src="${esc(c.dibujo)}">${c.verTxt}</button></td>`
           : `<td class="${c.c === true ? 'ok' : c.c === false ? 'mal' : ''}"${c.datos ? ` title="${esc(c.datos)}"` : ''}>${esc(c.t)}</td>`).join('')}
         ${nCorr ? `<td class="num"><strong>${f.ok}</strong> de ${nCorr}</td>` : ''}</tr>`).join('')
         || `<tr><td colspan="${5 + acts.length}" class="vacio">Nadie entró en esta clase.</td></tr>`}</tbody>

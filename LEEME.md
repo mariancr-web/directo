@@ -4,7 +4,15 @@ Web para dar clase al estilo Nearpod: subes tu presentación en PDF, intercalas 
 
 ## Qué hace
 
-- **Lecciones:** subes un PDF (cada página es una diapositiva), las reordenas y añades actividades entre ellas: test, encuesta, respuesta abierta, respuesta numérica con unidad y tolerancia, y dibujo en blanco o sobre una diapositiva.
+- **Lecciones:** subes un PDF (cada página es una diapositiva), las reordenas y añades actividades entre ellas: test, encuesta, respuesta abierta, respuesta numérica con unidad y tolerancia, dibujo en blanco o sobre una diapositiva, rellenar huecos, unir parejas, ordenar, completar una tabla, identificar partes de una imagen, memory, sopa de letras, subir una foto y muro colaborativo.
+- **Huecos y tablas:** escribe la solución entre corchetes dobles, por ejemplo `El carbono tiene [[4]] electrones`. Si valen varias respuestas, sepáralas con `|`: `[[covalente|covalentes]]`. En la tabla, separa las columnas con `|` y pon una fila por línea; la primera fila es la cabecera.
+- **Parejas:** una por línea, `izquierda | derecha`. El alumnado ve la columna derecha desordenada.
+- **Ordenar:** un elemento por línea, en el orden correcto. Se muestran desordenados.
+- **Identificar en imagen:** elige una diapositiva o sube una imagen y pulsa sobre ella para numerar las partes; debajo escribes el nombre de cada una. El alumnado los elige de una lista o, si lo marcas, los escribe.
+- **Memory:** parejas de cartas (una por línea, `fórmula | nombre`), hasta 10. Se guarda cuántos intentos necesita cada alumno.
+- **Sopa de letras:** una palabra por línea. Si añades `| pista`, el alumnado ve las pistas en vez de las palabras. Marcan cada palabra pulsando la primera y la última letra (o arrastrando).
+- **Subir foto:** cada alumno hace o elige una foto, con un comentario opcional. Se reduce antes de guardarla y la ves en una galería.
+- **Muro colaborativo:** cada alumno publica hasta 5 textos o imágenes (puedes desactivar las imágenes). Es anónimo para la clase salvo que marques «Mostrar el nombre». Puedes ocultar cualquier aportación desde el directo.
 - **Clase en directo:** el alumnado entra con su cuenta @nervion.salesianas.org y el código (o escaneando el QR). Solo se admiten cuentas de ese dominio. Tú avanzas con los botones, las flechas del teclado o un pasador de diapositivas; ellos no pueden ir por su cuenta.
 - **Control de actividades:** se abren solas al llegar a ellas. Puedes cerrarlas y mostrar los resultados a la clase, de forma anónima en el proyector.
 - **Seguimiento:** ves quién está conectado, quién ha respondido y cuántas veces ha salido cada alumno de la pestaña.
@@ -52,7 +60,8 @@ Si el dominio del alumnado no fuera exactamente `nervion.salesianas.org`, cámbi
 2. Pulsa **Empezar clase**. Se genera un código de 6 caracteres.
 3. Pulsa **Abrir vista para proyectar** y lleva esa ventana al proyector. El código y el QR aparecen abajo; ocúltalos cuando todos hayan entrado.
 4. Dirige la clase desde la ventana de control. Las flechas del teclado y los pasadores de diapositivas funcionan en las dos ventanas.
-5. Al acabar, pulsa **Finalizar clase** y revisa el informe.
+5. Si surge algo en clase, pulsa **Añadir actividad aquí**: se inserta justo después del paso actual (nueva o desde el banco), solo en esa clase.
+6. Al acabar, pulsa **Finalizar clase** y revisa el informe.
 
 El alumnado solo necesita abrir `https://tuusuario.github.io/clase/` en el navegador.
 

@@ -2,7 +2,7 @@ import { auth, db, configurado } from './firebase.js';
 import { NOMBRE_APP, DOMINIO_ALUMNADO } from './config.js';
 import { GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, onValue, onDisconnect, serverTimestamp, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-import { esc, rico, conDatos, esActividad, infoEnlace, nombreTipo, comprobar, respuestaHTML, solucionTexto, esCorregible } from './lib.js';
+import { esc, rico, conDatos, esActividad, infoEnlace, lista, MAX_MURO, POR_PARTES, pintarPartes, leerPartes, moverOrden, aciertosPorParte, reducirImagen, pintarSopa, lineaSopa, palabraSopa, nombreTipo, comprobar, respuestaHTML, solucionTexto, esCorregible } from './lib.js';
 
 const app = document.getElementById('app');
 const S = { code: null, alias: '', uid: null, session: null, slides: {}, resp: null, respItem: null, respUnsub: null, key: '', invitado: false };
@@ -41,6 +41,7 @@ function pantallaEntrada(msg = '') {
     <p class="aviso" role="alert">${esc(msg)}</p>
     <button class="btn primario grande" id="google">Entrar con la cuenta del colegio</button>
     <p class="sin-cuenta"><button type="button" class="enlace-btn" id="invitado">Entrar sin cuenta</button><br><span class="meta">Solo si tu profesor/a lo ha permitido en esta clase.</span></p>`}
+    <p class="acceso-docente"><a href="profesor.html">Acceso docente</a></p>
   </section>`;
 
   if (!conectado) {
@@ -167,6 +168,27 @@ async function diapo(page) {
   return (S.slides[page] = s.val());
 }
 
+// ── Pantalla completa ────────────────────────────────────────────
+// Donde el navegador no la permite (iPhone), se amplía dentro de la página
+const ICO_PC = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICO_SALIR_PC = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const elPC = () => document.fullscreenElement || document.webkitFullscreenElement;
+const enPantallaCompleta = () => !!elPC() || document.body.classList.contains('modo-amplio');
+async function alternarPantallaCompleta() {
+  const raiz = document.documentElement;
+  const pedir = raiz.requestFullscreen || raiz.webkitRequestFullscreen;
+  if (elPC()) await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  else if (document.body.classList.contains('modo-amplio')) document.body.classList.remove('modo-amplio');
+  else if (pedir) { try { await pedir.call(raiz); } catch { document.body.classList.add('modo-amplio'); } }
+  else document.body.classList.add('modo-amplio');
+  try { await screen.orientation?.lock?.('landscape'); } catch {}
+  S.key = ''; pintar();
+}
+const alCambiarPC = () => { document.body.classList.toggle('pantalla-completa', !!elPC()); S.key = ''; pintar(); };
+document.addEventListener('fullscreenchange', alCambiarPC);
+document.addEventListener('webkitfullscreenchange', alCambiarPC);
+app.addEventListener('click', e => { if (e.target.closest('#pc-alumno')) alternarPantallaCompleta(); });
+
 // ── Vista en directo ─────────────────────────────────────────────
 function pintar() {
   const ses = S.session;
@@ -186,6 +208,7 @@ function pintar() {
     <span class="codigo-mini">${esc(S.code)}</span>
     <span class="yo">${esc(S.alias)}</span>
     <span class="pos">${it ? `${(st.index ?? 0) + 1} / ${st.total ?? ''}` : ''}</span>
+    <button type="button" class="btn-ico btn-pc" id="pc-alumno" aria-label="${enPantallaCompleta() ? 'Salir de pantalla completa' : 'Pantalla completa'}" title="${enPantallaCompleta() ? 'Salir de pantalla completa' : 'Pantalla completa'}">${enPantallaCompleta() ? ICO_SALIR_PC : ICO_PC}</button>
   </header>
   <div class="escenario" id="esc"></div>`;
   const esc_ = app.querySelector('#esc');
@@ -216,7 +239,7 @@ function pintarActividad(el, it, st) {
   let cuerpo = '';
 
   if (st.reveal) cuerpo = resultadoAlumno(it, st, mia, tieneMia);
-  else if (!st.open) cuerpo = `<p class="estado-act">Las respuestas están cerradas.${tieneMia ? ` Tu respuesta: <strong>${respuestaHTML(it, mia)}</strong>` : ''}</p>`;
+  else if (!st.open) cuerpo = `<p class="estado-act">Las respuestas están cerradas.${tieneMia && !POR_PARTES.includes(it.type) && it.type !== 'wall' && it.type !== 'photo' ? ` Tu respuesta: <strong>${respuestaHTML(it, mia)}</strong>` : tieneMia ? ' Tu respuesta está enviada.' : ''}</p>`;
   else cuerpo = formulario(it, mia, tieneMia);
 
   el.innerHTML = `<article class="actividad"><p class="tipo">${nombreTipo(it)}</p><h2 class="enunciado">${rico(conDatos(it.prompt, it, S.uid))}</h2>${cuerpo}</article>`;
@@ -241,6 +264,42 @@ function formulario(it, mia, tieneMia) {
       </div>
       <p class="ayuda">Puedes escribir decimales con coma y potencias así: 3,2·10^4 o 3,2e4.</p>
       <button class="btn primario grande">Enviar respuesta</button></form>${nota}`;
+  }
+  if (it.type === 'photo') {
+    if (tieneMia && !S.rehacer) {
+      return `<img class="dibujo-enviado" src="${esc(mia.img)}" alt="Tu imagen">${mia.t ? `<p>${esc(mia.t)}</p>` : ''}${nota}<button type="button" class="btn" id="rehacer">Cambiar la imagen</button>`;
+    }
+    return `<form class="form-resp form-foto">
+      <label class="btn grande elegir-foto"><span id="foto-txt">Hacer una foto o elegir una imagen</span><input type="file" id="foto" accept="image/*" hidden></label>
+      <img class="dibujo-enviado" id="foto-prev" alt="Vista previa" hidden>
+      <textarea id="txt" rows="2" maxlength="500" placeholder="Comentario (opcional)"></textarea>
+      <p class="aviso" role="alert"></p>
+      <button class="btn primario grande">Enviar imagen</button></form>${nota}`;
+  }
+  if (it.type === 'wall') {
+    const mios = lista(mia);
+    return `${mios.length ? `<p class="tipo">Tus aportaciones</p><div class="muro muro-mio">${mios.map((p, i) => `<figure class="nota">${p.img ? `<img src="${esc(p.img)}" alt="Tu imagen">` : ''}${p.t ? `<p>${rico(p.t)}</p>` : ''}<button type="button" class="btn peq" data-borrar-nota="${i}">Quitar</button></figure>`).join('')}</div>` : ''}
+      ${mios.length < MAX_MURO ? `<form class="form-resp form-muro">
+        <textarea id="txt" rows="3" maxlength="600" placeholder="Escribe tu aportación"></textarea>
+        ${it.images !== false ? `<label class="btn elegir-foto"><span id="foto-txt">Añadir una imagen</span><input type="file" id="foto" accept="image/*" hidden></label><img class="dibujo-enviado" id="foto-prev" alt="Vista previa" hidden>` : ''}
+        <p class="aviso" role="alert"></p>
+        <button class="btn primario grande">Publicar en el muro</button></form>` : `<p class="estado-act">Has llegado al máximo de ${MAX_MURO} aportaciones. Quita alguna si quieres publicar otra.</p>`}
+      <p class="ayuda">${it.names ? 'Tu nombre aparecerá junto a lo que publiques.' : 'El resto de la clase no verá tu nombre, pero tu profesor/a sí.'}</p>`;
+  }
+  if (it.type === 'memory') {
+    if (mia?.hecho && !S.rehacer) return `<p class="tu-resp ok">¡Completado en <strong>${mia.intentos} intentos</strong>!</p><button type="button" class="btn" id="rehacer">Jugar otra vez</button>`;
+    return `<p class="marcador-memory" id="marcador">Parejas: 0 de ${(it.cards || []).length / 2} · Intentos: 0</p>
+      <div class="memory">${(it.cards || []).map((c, j) => `<button type="button" class="carta" data-j="${j}" aria-label="Carta ${j + 1}"><span class="carta-dorso" aria-hidden="true"></span><span class="carta-cara">${rico(c.t)}</span></button>`).join('')}</div>`;
+  }
+  if (it.type === 'search') {
+    const n = (it.words || it.h || []).length, h = lista(mia).length;
+    return `${pintarSopa(it, mia, { editable: true })}
+      <p class="estado-act ${h === n ? 'ok' : ''}" id="estado-sopa" aria-live="polite">${h === n ? '¡Has encontrado todas las palabras!' : `Has encontrado ${h} de ${n}. Pulsa la primera letra y después la última (o arrastra).`}</p>`;
+  }
+  if (POR_PARTES.includes(it.type)) {
+    return `<form class="form-resp form-partes">${pintarPartes(it, mia, { editable: true })}
+      <p class="aviso" role="alert"></p>
+      <button class="btn primario grande">${tieneMia ? 'Volver a enviar' : 'Enviar respuesta'}</button></form>${nota}`;
   }
   if (it.type === 'draw') {
     if (tieneMia && !S.rehacer) {
@@ -278,6 +337,56 @@ function activarFormulario(el, it, mia) {
     const u = el.querySelector('#uni'); if (u) v.u = u.value.trim();
     if (v.n) enviar(v);
   };
+  if (it.type === 'photo' || it.type === 'wall') {
+    const re = el.querySelector('#rehacer');
+    if (re) { re.onclick = () => { S.rehacer = true; S.key = ''; pintar(); }; return; }
+    el.querySelectorAll('[data-borrar-nota]').forEach(b => b.onclick = () => {
+      const resto = lista(mia).filter((_, i) => i !== Number(b.dataset.borrarNota));
+      resto.length ? enviar(resto) : set(ref(db, `responses/${S.code}/${it.id}/${S.uid}`), null);
+    });
+    const f = el.querySelector('form'); if (!f) return;
+    let img = '';
+    const fi = f.querySelector('#foto');
+    if (fi) fi.onchange = async () => {
+      const file = fi.files[0]; if (!file) return;
+      f.querySelector('#foto-txt').textContent = 'Preparando la imagen…';
+      try {
+        img = await reducirImagen(file, it.type === 'wall' ? 800 : 1280, it.type === 'wall' ? 0.65 : 0.72);
+        const pv = f.querySelector('#foto-prev'); pv.src = img; pv.hidden = false;
+        f.querySelector('#foto-txt').textContent = 'Cambiar la imagen';
+      } catch (e) { console.error(e); f.querySelector('.aviso').textContent = 'No se ha podido leer esa imagen. Prueba con otra.'; f.querySelector('#foto-txt').textContent = 'Elegir otra imagen'; }
+    };
+    f.onsubmit = e => {
+      e.preventDefault();
+      const t = f.querySelector('#txt').value.trim();
+      if (it.type === 'photo') {
+        if (!img) { f.querySelector('.aviso').textContent = 'Elige primero una imagen.'; return; }
+        S.rehacer = false;
+        return enviar(t ? { img, t } : { img });
+      }
+      if (!t && !img) { f.querySelector('.aviso').textContent = 'Escribe algo o añade una imagen.'; return; }
+      const nueva = { at: Date.now() }; if (t) nueva.t = t; if (img) nueva.img = img;
+      enviar([...lista(mia), nueva]);
+    };
+    return;
+  }
+  if (it.type === 'memory') {
+    const re = el.querySelector('#rehacer');
+    if (re) { re.onclick = () => { S.rehacer = true; S.key = ''; pintar(); }; return; }
+    jugarMemory(el, it, enviar);
+    return;
+  }
+  if (it.type === 'search') { jugarSopa(el, it, mia, enviar); return; }
+  if (POR_PARTES.includes(it.type)) {
+    const f = el.querySelector('form');
+    f.onclick = e => { const b = e.target.closest('[data-mover]'); if (b) moverOrden(b); };
+    f.onsubmit = e => {
+      e.preventDefault();
+      const v = leerPartes(el, it);
+      if (it.type !== 'order' && v.some(x => !x)) { f.querySelector('.aviso').textContent = it.type === 'match' ? 'Elige una pareja para cada elemento.' : it.type === 'label' ? 'Pon un nombre a cada número.' : 'Rellena todos los huecos.'; return; }
+      enviar(v);
+    };
+  }
   if (it.type === 'draw') {
     const re = el.querySelector('#rehacer');
     if (re) { re.onclick = () => { S.rehacer = true; S.key = ''; pintar(); }; return; }
@@ -316,6 +425,22 @@ function resultadoAlumno(it, st, mia, tieneMia) {
     html += `<p class="solucion">Respuestas válidas: <strong>${esc(String(it.accepted).split(';').map(s => s.trim()).filter(Boolean).join(', '))}</strong></p>`;
   } else if (it.type === 'draw') {
     html += `<p class="estado-act">Tu profesor/a está comentando los dibujos en la pizarra.</p>`;
+  } else if (it.type === 'photo') {
+    return tieneMia ? `<img class="dibujo-enviado" src="${esc(mia.img)}" alt="Tu imagen"><p class="estado-act">Tu profesor/a está comentando las imágenes en la pizarra.</p>` : `<p class="estado-act">No enviaste imagen.</p>`;
+  } else if (it.type === 'wall') {
+    const posts = st.results?.posts || [];
+    return `<p class="estado-act">El muro de la clase${posts.length ? '' : ' aún está vacío'}. Las imágenes se ven en la pizarra.</p>
+      <div class="muro">${posts.map(p => `<figure class="nota"><p>${rico(p.t)}</p>${p.a ? `<figcaption>${esc(p.a)}</figcaption>` : ''}</figure>`).join('')}</div>`;
+  } else if (it.type === 'memory') {
+    return `${tieneMia && mia?.hecho ? `<p class="tu-resp ok">Lo completaste en <strong>${mia.intentos} intentos</strong>.</p>` : `<p class="estado-act">No llegaste a completarlo.</p>`}
+      <p class="tipo">Las parejas</p><ul class="parejas">${(it.pairs || []).map(p => `<li><span class="pareja-izq">${rico(p[0])}</span><span class="pareja-flecha" aria-hidden="true">→</span><span>${rico(p[1])}</span></li>`).join('')}</ul>`;
+  } else if (it.type === 'search') {
+    const n = (it.words || []).length, h = lista(mia).length;
+    return pintarSopa(it, mia, { conSolucion: true }) + `<p class="tu-resp ${h === n ? 'ok' : 'mal'}"><strong>${h} de ${n}</strong> palabras encontradas.${h < n ? ' Las que te faltaban están marcadas con borde.' : ' ¡Muy bien!'}</p>`;
+  } else if (POR_PARTES.includes(it.type)) {
+    if (!tieneMia) return `<p class="estado-act">No enviaste respuesta.</p>`;
+    const ok = aciertosPorParte(it, mia), n = ok.filter(Boolean).length;
+    return pintarPartes(it, mia) + `<p class="tu-resp ${n === ok.length ? 'ok' : 'mal'}"><strong>${n} de ${ok.length}</strong> ${n === ok.length ? 'correctas. ¡Muy bien!' : 'correctas. Debajo de cada fallo tienes la respuesta buena.'}</p>`;
   }
   if (it.type !== 'quiz' && it.type !== 'draw') {
     if (tieneMia) {
@@ -324,6 +449,73 @@ function resultadoAlumno(it, st, mia, tieneMia) {
     } else html += `<p class="estado-act">No enviaste respuesta.</p>`;
   }
   return html;
+}
+
+// ── Memory ───────────────────────────────────────────────────────
+function jugarMemory(el, it, enviar) {
+  const cartas = it.cards || [], total = cartas.length / 2;
+  const inicio = Date.now();
+  let abiertas = [], hechas = 0, intentos = 0, bloqueo = false;
+  const marcador = () => { el.querySelector('#marcador').textContent = `Parejas: ${hechas} de ${total} · Intentos: ${intentos}`; };
+  el.querySelector('.memory').onclick = e => {
+    const b = e.target.closest('.carta');
+    if (!b || bloqueo || b.classList.contains('vuelta') || b.classList.contains('hecha')) return;
+    b.classList.add('vuelta'); abiertas.push(b);
+    if (abiertas.length < 2) return;
+    intentos++;
+    const [a, c] = abiertas; abiertas = [];
+    if (cartas[a.dataset.j].k === cartas[c.dataset.j].k) {
+      a.classList.add('hecha'); c.classList.add('hecha'); hechas++;
+      marcador();
+      if (hechas === total) { S.rehacer = false; setTimeout(() => enviar({ hecho: true, intentos, seg: Math.round((Date.now() - inicio) / 1000) }), 700); }
+    } else {
+      marcador(); bloqueo = true;
+      setTimeout(() => { a.classList.remove('vuelta'); c.classList.remove('vuelta'); bloqueo = false; }, 1100);
+    }
+  };
+}
+
+// ── Sopa de letras: pulsar primera y última letra, o arrastrar ───
+function jugarSopa(el, it, mia, enviar) {
+  const sopa = el.querySelector('.sopa');
+  const estado = el.querySelector('#estado-sopa');
+  const halladas = [...lista(mia)];
+  const total = (it.words || it.h || []).length;
+  let inicio = null, arrastrando = false;
+  const celda = (r, c) => sopa.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+  const limpiar = () => sopa.querySelectorAll('.marcando, .inicio').forEach(x => x.classList.remove('marcando', 'inicio'));
+  const marcar = fin => {
+    limpiar();
+    if (!inicio) return;
+    celda(...inicio).classList.add('inicio');
+    if (fin) (lineaSopa(...inicio, ...fin) || []).forEach(([r, c]) => celda(r, c)?.classList.add('marcando'));
+  };
+  const terminar = fin => {
+    const celdas = lineaSopa(...inicio, ...fin);
+    inicio = null; limpiar();
+    if (!celdas) { estado.textContent = 'Las letras tienen que estar en línea recta.'; return; }
+    const i = palabraSopa(it, celdas);
+    if (i < 0) { estado.textContent = 'Esa no es una de las palabras. Prueba otra vez.'; sopa.classList.add('fallo'); setTimeout(() => sopa.classList.remove('fallo'), 400); return; }
+    if (halladas.some(h => h.i === i)) { estado.textContent = 'Esa palabra ya la tenías.'; return; }
+    const [[r1, c1], [r2, c2]] = [celdas[0], celdas[celdas.length - 1]];
+    halladas.push({ i, r1, c1, r2, c2 });
+    enviar(halladas);
+  };
+  const deEvento = e => { const b = document.elementFromPoint(e.clientX, e.clientY)?.closest('.celda'); return b && sopa.contains(b) ? [Number(b.dataset.r), Number(b.dataset.c)] : null; };
+  sopa.onpointerdown = e => {
+    const p = deEvento(e); if (!p) return;
+    e.preventDefault();
+    if (inicio && (inicio[0] !== p[0] || inicio[1] !== p[1])) return terminar(p);
+    inicio = p; arrastrando = true; marcar();
+    estado.textContent = `Has encontrado ${halladas.length} de ${total}. Ahora pulsa la última letra.`;
+  };
+  sopa.onpointermove = e => { if (arrastrando && inicio) { const p = deEvento(e); if (p) marcar(p); } };
+  sopa.onpointerup = e => {
+    if (!arrastrando) return; arrastrando = false;
+    const p = deEvento(e);
+    if (inicio && p && (p[0] !== inicio[0] || p[1] !== inicio[1])) terminar(p);
+  };
+  sopa.onpointercancel = () => { arrastrando = false; };
 }
 
 // ── Lienzo de dibujo ─────────────────────────────────────────────
