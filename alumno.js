@@ -23,8 +23,8 @@ function pantallaEntrada(msg = '') {
   const u = auth.currentUser;
   const conectado = dominioOk(u);
   app.innerHTML = `
-  <section class="entrada">
-    <img class="logo-entrada logo-claro" src="logo.svg" alt="mariancr">
+  <div class="mcr-acceso"><section class="entrada mcr-acceso__tarjeta">
+    <img class="logo-claro" src="logo.svg" alt="mariancr">
     <p class="marca-texto">${esc(NOMBRE_APP)}</p>
     <h1>Entra en la clase</h1>
     ${conectado ? `
@@ -35,14 +35,14 @@ function pantallaEntrada(msg = '') {
         <input id="code" class="codigo-input" maxlength="6" required value="${esc(code)}" autocapitalize="characters" spellcheck="false">
       </label>
       <p class="aviso" role="alert">${esc(msg)}</p>
-      <button class="btn primario grande" type="submit">Entrar en la clase</button>
+      <button class="mcr-btn mcr-btn--prim mcr-btn--ancho" type="submit">Entrar en la clase</button>
     </form>` : `
     <p>Inicia sesión con tu cuenta del colegio (<strong>@${esc(DOMINIO_ALUMNADO)}</strong>).</p>
     <p class="aviso" role="alert">${esc(msg)}</p>
-    <button class="btn primario grande" id="google">Entrar con la cuenta del colegio</button>
+    <button class="mcr-btn mcr-btn--prim mcr-btn--ancho" id="google">Entrar con la cuenta del colegio</button>
     <p class="sin-cuenta"><button type="button" class="enlace-btn" id="invitado">Entrar sin cuenta</button><br><span class="meta">Solo si tu profesor/a lo ha permitido en esta clase.</span></p>`}
-    <p class="acceso-docente"><a href="profesor.html">Acceso docente</a></p>
-  </section>`;
+    <p class="mcr-acceso__docente acceso-docente"><a href="profesor.html">Acceso docente</a></p>
+  </section></div>`;
 
   if (!conectado) {
     app.querySelector('#invitado').onclick = () => pantallaInvitado(code);
@@ -74,8 +74,8 @@ function pantallaEntrada(msg = '') {
 // ── Entrar sin cuenta (solo si la docente lo permite en esa clase) ──
 function pantallaInvitado(code = '', msg = '', nombre = '') {
   app.innerHTML = `
-  <section class="entrada">
-    <img class="logo-entrada logo-claro" src="logo.svg" alt="mariancr">
+  <div class="mcr-acceso"><section class="entrada mcr-acceso__tarjeta">
+    <img class="logo-claro" src="logo.svg" alt="mariancr">
     <p class="marca-texto">${esc(NOMBRE_APP)}</p>
     <h1>Entrar sin cuenta</h1>
     <form id="f" class="formulario" autocomplete="off">
@@ -86,10 +86,10 @@ function pantallaInvitado(code = '', msg = '', nombre = '') {
         <input id="nombre" required maxlength="60" value="${esc(nombre)}" autocomplete="name">
       </label>
       <p class="aviso" role="alert">${esc(msg)}</p>
-      <button class="btn primario grande" type="submit">Entrar en la clase</button>
+      <button class="mcr-btn mcr-btn--prim mcr-btn--ancho" type="submit">Entrar en la clase</button>
       <p class="sin-cuenta"><button type="button" class="enlace-btn" id="volver">Entrar con la cuenta del colegio</button></p>
     </form>
-  </section>`;
+  </section></div>`;
   const f = app.querySelector('#f');
   const ci = f.querySelector('#code');
   ci.addEventListener('input', () => { ci.value = ci.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
@@ -194,7 +194,7 @@ function pintar() {
   const ses = S.session;
   if (!ses || ses.endedAt) {
     if (S.key === 'fin') return; S.key = 'fin';
-    app.innerHTML = `<section class="entrada"><h1>La clase ha terminado</h1><p>Gracias, ${esc(S.alias)}. Ya puedes cerrar esta página.</p></section>`;
+    app.innerHTML = `<div class="mcr-acceso"><section class="entrada mcr-acceso__tarjeta"><h1>La clase ha terminado</h1><p>Gracias, ${esc(S.alias)}. Ya puedes cerrar esta página.</p></section></div>`;
     return;
   }
   colorCurso(ses.curso);
@@ -314,7 +314,7 @@ function formulario(it, mia, tieneMia) {
         <button type="button" class="btn peq" id="borrar">Borrar todo</button>
       </div>
       <div class="caja-lienzo" id="caja"></div>
-      <button class="btn primario grande" id="enviar-dibujo">Enviar dibujo</button>${nota}
+      <button class="mcr-btn mcr-btn--prim mcr-btn--ancho" id="enviar-dibujo">Enviar dibujo</button>${nota}
       <p class="aviso" id="aviso-d" role="alert"></p>`;
   }
   return '';
@@ -575,7 +575,7 @@ function crearLienzo(caja) {
 
 // ── Arranque ─────────────────────────────────────────────────────
 if (!configurado) {
-  app.innerHTML = `<section class="entrada"><h1>Falta configurar la aplicación</h1><p>Tu profesor/a todavía no ha conectado esta web con su base de datos.</p></section>`;
+  app.innerHTML = `<div class="mcr-acceso"><section class="entrada mcr-acceso__tarjeta"><h1>Falta configurar la aplicación</h1><p>Tu profesor/a todavía no ha conectado esta web con su base de datos.</p></section></div>`;
 } else {
   onAuthStateChanged(auth, async u => {
     if (S.code || S.invitado) return; // ya está dentro de una clase o entrando sin cuenta

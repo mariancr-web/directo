@@ -27,11 +27,11 @@ function reset() {
 }
 
 function marco(html) {
-  return `<header class="barra">
-    <a class="marca" href="#/"><img src="logo-negativo.svg" alt="mariancr"><span class="marca-nombre">${esc(NOMBRE_APP)}</span></a>
-    <div class="usuario"><span>${esc(U?.displayName || U?.email || '')}</span><button class="btn peq" id="salir">Salir</button></div>
+  return `<header class="mcr-barra">
+    <a class="mcr-barra__marca" href="#/"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">${esc(NOMBRE_APP)}</span></a>
+    <div class="mcr-barra__usuario"><span>${esc(U?.displayName || U?.email || '')}</span><button class="mcr-btn mcr-btn--peq" id="salir">Salir</button></div>
   </header><main class="contenido">${html}</main>
-  <footer class="pie-web">mariancr · ${esc(NOMBRE_APP)}</footer>`;
+  <footer class="mcr-pie-app">mariancr · ${esc(NOMBRE_APP)}</footer>`;
 }
 
 function enlaceAlumno(code) {
@@ -50,12 +50,12 @@ function estado(items, i) {
 // ── Acceso ───────────────────────────────────────────────────────
 function pantallaLogin() {
   reset();
-  app.innerHTML = `<section class="acceso">
-    <img class="logo-entrada logo-claro" src="logo.svg" alt="mariancr">
+  app.innerHTML = `<div class="mcr-acceso"><section class="acceso mcr-acceso__tarjeta">
+    <img class="logo-claro" src="logo.svg" alt="mariancr">
     <h1>${esc(NOMBRE_APP)}</h1>
     <p>Prepara tus lecciones y dirige la clase desde aquí. El alumnado entra con su cuenta del colegio y el código de la clase.</p>
-    <button class="btn primario grande" id="google">Entrar con Google</button>
-    <p class="aviso" id="err" role="alert"></p></section>`;
+    <button class="mcr-btn mcr-btn--prim mcr-btn--ancho" id="google">Entrar con Google</button>
+    <p class="aviso" id="err" role="alert"></p></section></div>`;
   $('#google').onclick = async () => {
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
     catch (e) { $('#err').textContent = `No se ha podido iniciar sesión (${e.code || e.message}). Si usas GitHub Pages, revisa que su dominio esté en los dominios autorizados de Firebase.`; }
@@ -64,20 +64,20 @@ function pantallaLogin() {
 
 function pantallaSinPermiso(user) {
   reset();
-  app.innerHTML = `<section class="acceso">
+  app.innerHTML = `<div class="mcr-acceso"><section class="acceso mcr-acceso__tarjeta">
     <h1>Falta un paso</h1>
     <p>Has entrado como ${esc(user.email)}, pero esta cuenta aún no está autorizada como docente.</p>
     <p>En la consola de Firebase, abre Realtime Database, crea dentro de <code>teachers</code> una clave con este identificador y ponle el valor <code>true</code>:</p>
     <p class="uid"><code>${esc(user.uid)}</code> <button class="btn peq" id="copiar">Copiar</button></p>
     <p>Después, recarga esta página.</p>
-    <button class="btn" id="salir">Usar otra cuenta</button></section>`;
+    <button class="btn" id="salir">Usar otra cuenta</button></section></div>`;
   $('#copiar').onclick = () => navigator.clipboard?.writeText(user.uid).then(() => { $('#copiar').textContent = 'Copiado'; });
 }
 
 app.addEventListener('click', e => { if (e.target.closest('#salir')) signOut(auth); });
 
 if (!configurado) {
-  app.innerHTML = `<section class="acceso"><h1>Falta conectar Firebase</h1><p>Abre <code>config.js</code> y pega la configuración de tu proyecto de Firebase. En el archivo <code>LEEME.md</code> tienes los pasos.</p></section>`;
+  app.innerHTML = `<div class="mcr-acceso"><section class="acceso mcr-acceso__tarjeta"><h1>Falta conectar Firebase</h1><p>Abre <code>config.js</code> y pega la configuración de tu proyecto de Firebase. En el archivo <code>LEEME.md</code> tienes los pasos.</p></section></div>`;
 } else {
   onAuthStateChanged(auth, async user => {
     if (!user || user.isAnonymous) { U = null; return pantallaLogin(); }
@@ -110,18 +110,18 @@ function vistaInicio() {
   if (filtro !== 'todas' && filtro !== 'sin' && !CLASES.some(c => c.id === filtro)) filtro = 'todas';
   let lecciones = [], sesiones = [], cuantas = 40, cargadas = false;
   app.innerHTML = marco(`
-  <div class="hero hero-inicio">
-    <nav class="pestanas-clase" id="pestanas" aria-label="Clases"></nav>
-    <div class="cab-bloque"><h1 id="tit-lecciones">Tus lecciones</h1><div class="acciones"><a class="btn" href="#/banco">Banco de preguntas</a><button class="btn primario" id="nueva">Nueva lección</button></div></div>
+  <div class="hero hero-inicio mcr-hero">
+    <nav class="mcr-filtros" id="pestanas" aria-label="Clases"></nav>
+    <div class="cab-bloque"><h1 id="tit-lecciones">Tus lecciones</h1><div class="acciones"><a class="mcr-btn mcr-btn--sec" href="#/banco">Banco de preguntas</a><button class="mcr-btn mcr-btn--prim" id="nueva">Nueva lección</button></div></div>
   </div>
   <section class="bloque">
-    <h2 id="tit-lec2">Lecciones</h2>
+    <h2 class="mcr-seccion" id="tit-lec2">Lecciones</h2>
     <div id="lecciones"><p class="vacio">Cargando…</p></div>
   </section>
   <section class="bloque">
-    <h2 id="tit-sesiones">Clases dadas</h2>
-    <ul class="lista" id="sesiones"><li class="vacio">Cargando…</li></ul>
-    <button class="btn" id="mas" hidden>Ver clases más antiguas</button>
+    <h2 class="mcr-seccion" id="tit-sesiones">Clases dadas</h2>
+    <ul class="mcr-lista" id="sesiones"><li class="vacio">Cargando…</li></ul>
+    <button class="mcr-btn" id="mas" hidden>Ver clases más antiguas</button>
   </section>`);
 
   const clase = () => CLASES.find(c => c.id === filtro) || null;
@@ -138,7 +138,7 @@ function vistaInicio() {
   function pintarPestanas() {
     const haySin = lecciones.some(([, l]) => !cursoDe(l.curso));
     const ps = [['todas', 'Todas', 'general'], ...CLASES.map(c => [c.id, c.nombre, c.curso]), ...(haySin ? [['sin', 'Sin curso', 'sin']] : [])];
-    $('#pestanas').innerHTML = ps.map(([id, n, curso]) => `<button type="button" class="pestana curso-${curso}" data-filtro="${id}" aria-pressed="${filtro === id}">${esc(n)}</button>`).join('');
+    $('#pestanas').innerHTML = ps.map(([id, n, curso]) => `<button type="button" class="mcr-filtro curso-${curso}" data-filtro="${id}" aria-pressed="${filtro === id}">${esc(n)}</button>`).join('');
     const c = clase();
     $('#tit-lecciones').textContent = c ? c.nombre : filtro === 'sin' ? 'Sin curso' : 'Tus lecciones';
     $('#tit-lec2').textContent = c ? `Lecciones de ${cursoDe(c.curso).nombre} · ${c.materia}` : 'Lecciones';
@@ -149,16 +149,16 @@ function vistaInicio() {
   const tarjetaLeccion = ([id, l]) => {
     const its = l.items || [];
     const nd = its.filter(i => i.type === 'slide').length, na = its.length - nd;
-    return `<li class="fila tarjeta ${cursoDe(l.curso) ? 'curso-' + l.curso : ''}">
-      <div class="fila-info"><a class="fila-titulo" href="#/leccion/${id}">${esc(l.title)}</a>
-        <span class="meta">${nd} ${nd === 1 ? 'diapositiva' : 'diapositivas'} y ${na} ${na === 1 ? 'actividad' : 'actividades'}</span></div>
-      <div class="fila-acc">
-        <a class="btn peq" href="#/leccion/${id}">Editar</a>
-        <button class="btn peq primario" data-empezar="${id}" ${its.length ? '' : 'disabled'}>Empezar clase${clase()?.grupo ? ' con ' + esc(clase().nombre) : ''}</button>
-        <button class="btn peq peligro" data-borrar="${id}">Eliminar</button>
+    return `<li class="mcr-tarjeta ${cursoDe(l.curso) ? 'curso-' + l.curso : ''}">
+      <div class="fila-info"><a class="mcr-tarjeta__titulo" href="#/leccion/${id}">${esc(l.title)}</a>
+        <span class="mcr-tarjeta__meta">${nd} ${nd === 1 ? 'diapositiva' : 'diapositivas'} y ${na} ${na === 1 ? 'actividad' : 'actividades'}</span></div>
+      <div class="mcr-tarjeta__acc">
+        <a class="mcr-btn mcr-btn--peq" href="#/leccion/${id}">Editar</a>
+        <button class="mcr-btn mcr-btn--peq mcr-btn--prim" data-empezar="${id}" ${its.length ? '' : 'disabled'}>Empezar clase${clase()?.grupo ? ' con ' + esc(clase().nombre) : ''}</button>
+        <button class="mcr-btn mcr-btn--peq mcr-btn--peligro" data-borrar="${id}">Eliminar</button>
       </div></li>`;
   };
-  const vacia = (msg, boton = true) => `<div class="tarjeta-vacia"><p>${msg}</p>${boton ? `<button class="btn primario" data-nueva>${lecciones.length ? 'Crear una lección' : 'Crear la primera lección'}</button>` : ''}</div>`;
+  const vacia = (msg, boton = true) => `<div class="mcr-vacio"><span>${msg}</span>${boton ? `<button class="mcr-btn mcr-btn--prim" data-nueva>${lecciones.length ? 'Crear una lección' : 'Crear la primera lección'}</button>` : ''}</div>`;
   const ordenar = ls => ls.sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
 
   // Secciones desplegables abiertas en «Todas» (se recuerdan)
@@ -170,16 +170,16 @@ function vistaInicio() {
     if (!lecciones.length) { el.innerHTML = vacia('Aún no tienes lecciones. Crea una y sube tu presentación en PDF.'); return; }
     if (filtro !== 'todas') {
       const ls = ordenar(lecciones.filter(([, l]) => pasa(l.curso)));
-      el.innerHTML = ls.length ? `<ul class="lista">${ls.map(tarjetaLeccion).join('')}</ul>` : vacia('No hay lecciones en esta clase todavía.');
+      el.innerHTML = ls.length ? `<ul class="mcr-lista">${ls.map(tarjetaLeccion).join('')}</ul>` : vacia('No hay lecciones en esta clase todavía.');
       return;
     }
     const grupos = [...CURSOS.map(c => ({ id: c.id, nombre: c.nombre, materia: c.materia, ls: lecciones.filter(([, l]) => l.curso === c.id) })),
       { id: 'sin', nombre: 'Sin curso', materia: 'Elige el curso dentro de cada lección', ls: lecciones.filter(([, l]) => !cursoDe(l.curso)) }].filter(g => g.ls.length);
     let abiertas = leerAbiertas();
     if (!abiertas) { const ult = sesiones[0] && cursoSesion(sesiones[0][1]); abiertas = [cursoDe(ult) ? ult : grupos[0]?.id]; }
-    el.innerHTML = grupos.map(g => `<details class="seccion-curso ${g.id === 'sin' ? 'curso-sin' : 'curso-' + g.id}" data-g="${g.id}" ${abiertas.includes(g.id) ? 'open' : ''}>
-      <summary><span class="chip-relleno">${esc(g.nombre)}</span><span class="materia">${esc(g.materia)}</span><span class="cuenta-lec">${g.ls.length} ${g.ls.length === 1 ? 'lección' : 'lecciones'}</span><span class="flecha" aria-hidden="true">›</span></summary>
-      <ul class="lista">${ordenar(g.ls).map(tarjetaLeccion).join('')}</ul></details>`).join('');
+    el.innerHTML = grupos.map(g => `<details class="mcr-grupo ${g.id === 'sin' ? 'curso-sin' : 'curso-' + g.id}" data-g="${g.id}" ${abiertas.includes(g.id) ? 'open' : ''}>
+      <summary><span class="mcr-grupo__chip">${esc(g.nombre)}</span><span class="mcr-grupo__nombre">${esc(g.materia)}</span><span class="mcr-grupo__n">${g.ls.length} ${g.ls.length === 1 ? 'lección' : 'lecciones'}</span></summary>
+      <ul class="mcr-lista">${ordenar(g.ls).map(tarjetaLeccion).join('')}</ul></details>`).join('');
     el.querySelectorAll('details').forEach(d => d.ontoggle = () => {
       guardarAbiertas([...el.querySelectorAll('details[open]')].map(x => x.dataset.g));
     });
@@ -190,14 +190,14 @@ function vistaInicio() {
     const ss = sesiones.filter(([, s]) => pasa(cursoSesion(s), s.grupo, true));
     ul.innerHTML = ss.length ? ss.map(([code, s]) => {
       const cs = cursoSesion(s);
-      return `<li class="fila tarjeta ${s.endedAt ? 'terminada' : 'en-curso'}">
-      <div class="fila-info"><span class="fila-titulo">${esc(s.lessonTitle)}</span>
-        <span class="meta">${filtro === 'todas' || filtro === 'sin' ? chipClase(cs, s.grupo) : ''}${fecha(s.createdAt)}, código ${code}</span></div>
-      <div class="fila-acc">
-        ${s.endedAt ? '' : `<span class="pildora-en-curso">En curso</span><a class="btn peq primario" href="#/directo/${code}">Volver al directo</a>`}
-        <a class="btn peq" href="#/informe/${code}">Informe</a>
+      return `<li class="mcr-tarjeta ${s.endedAt ? 'mcr-tarjeta--fin' : 'mcr-tarjeta--vivo'}">
+      <div class="fila-info"><span class="mcr-tarjeta__titulo">${esc(s.lessonTitle)}</span>
+        <span class="mcr-tarjeta__meta">${filtro === 'todas' || filtro === 'sin' ? chipClase(cs, s.grupo) : ''}${fecha(s.createdAt)}, código ${code}</span></div>
+      <div class="mcr-tarjeta__acc">
+        ${s.endedAt ? '' : `<span class="mcr-vivo">En curso</span><a class="mcr-btn mcr-btn--peq mcr-btn--prim" href="#/directo/${code}">Volver al directo</a>`}
+        <a class="mcr-btn mcr-btn--peq" href="#/informe/${code}">Informe</a>
       </div></li>`;
-    }).join('') : `<li class="tarjeta-vacia"><p>${sesiones.length ? 'Aún no has dado clase con este grupo.' : 'Cuando des tu primera clase, aparecerá aquí con su informe.'}</p></li>`;
+    }).join('') : `<li class="mcr-vacio"><span>${sesiones.length ? 'Aún no has dado clase con este grupo.' : 'Cuando des tu primera clase, aparecerá aquí con su informe.'}</span></li>`;
     $('#mas').hidden = sesiones.length < cuantas;
   }
   const pintarTodo = () => { pintarPestanas(); pintarLecciones(); pintarSesiones(); };
