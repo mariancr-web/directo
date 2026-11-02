@@ -2,7 +2,7 @@ import { auth, db, configurado } from './firebase.js';
 import { NOMBRE_APP, DOMINIO_ALUMNADO } from './config.js';
 import { GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, onValue, onDisconnect, serverTimestamp, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-import { esc, rico, conDatos, esActividad, infoEnlace, lista, MAX_MURO, POR_PARTES, pintarPartes, leerPartes, moverOrden, aciertosPorParte, reducirImagen, colorCurso, pintarSopa, lineaSopa, palabraSopa, nombreTipo, comprobar, respuestaHTML, solucionTexto, esCorregible } from './lib.js';
+import { esc, rico, conDatos, esActividad, infoEnlace, lista, MAX_MURO, POR_PARTES, pintarPartes, leerPartes, moverOrden, aciertosPorParte, reducirImagen, colorCurso, pintarSopa, jugarMemory, jugarSopa, lineaSopa, palabraSopa, nombreTipo, comprobar, respuestaHTML, solucionTexto, esCorregible } from './lib.js';
 
 const app = document.getElementById('app');
 const S = { code: null, alias: '', uid: null, session: null, slides: {}, resp: null, respItem: null, respUnsub: null, key: '', invitado: false };
@@ -374,7 +374,7 @@ function activarFormulario(el, it, mia) {
   if (it.type === 'memory') {
     const re = el.querySelector('#rehacer');
     if (re) { re.onclick = () => { S.rehacer = true; S.key = ''; pintar(); }; return; }
-    jugarMemory(el, it, enviar);
+    jugarMemory(el, it, v => { S.rehacer = false; enviar(v); });
     return;
   }
   if (it.type === 'search') { jugarSopa(el, it, mia, enviar); return; }
@@ -450,73 +450,6 @@ function resultadoAlumno(it, st, mia, tieneMia) {
     } else html += `<p class="estado-act">No enviaste respuesta.</p>`;
   }
   return html;
-}
-
-// ── Memory ───────────────────────────────────────────────────────
-function jugarMemory(el, it, enviar) {
-  const cartas = it.cards || [], total = cartas.length / 2;
-  const inicio = Date.now();
-  let abiertas = [], hechas = 0, intentos = 0, bloqueo = false;
-  const marcador = () => { el.querySelector('#marcador').textContent = `Parejas: ${hechas} de ${total} · Intentos: ${intentos}`; };
-  el.querySelector('.memory').onclick = e => {
-    const b = e.target.closest('.carta');
-    if (!b || bloqueo || b.classList.contains('vuelta') || b.classList.contains('hecha')) return;
-    b.classList.add('vuelta'); abiertas.push(b);
-    if (abiertas.length < 2) return;
-    intentos++;
-    const [a, c] = abiertas; abiertas = [];
-    if (cartas[a.dataset.j].k === cartas[c.dataset.j].k) {
-      a.classList.add('hecha'); c.classList.add('hecha'); hechas++;
-      marcador();
-      if (hechas === total) { S.rehacer = false; setTimeout(() => enviar({ hecho: true, intentos, seg: Math.round((Date.now() - inicio) / 1000) }), 700); }
-    } else {
-      marcador(); bloqueo = true;
-      setTimeout(() => { a.classList.remove('vuelta'); c.classList.remove('vuelta'); bloqueo = false; }, 1100);
-    }
-  };
-}
-
-// ── Sopa de letras: pulsar primera y última letra, o arrastrar ───
-function jugarSopa(el, it, mia, enviar) {
-  const sopa = el.querySelector('.sopa');
-  const estado = el.querySelector('#estado-sopa');
-  const halladas = [...lista(mia)];
-  const total = (it.words || it.h || []).length;
-  let inicio = null, arrastrando = false;
-  const celda = (r, c) => sopa.querySelector(`[data-r="${r}"][data-c="${c}"]`);
-  const limpiar = () => sopa.querySelectorAll('.marcando, .inicio').forEach(x => x.classList.remove('marcando', 'inicio'));
-  const marcar = fin => {
-    limpiar();
-    if (!inicio) return;
-    celda(...inicio).classList.add('inicio');
-    if (fin) (lineaSopa(...inicio, ...fin) || []).forEach(([r, c]) => celda(r, c)?.classList.add('marcando'));
-  };
-  const terminar = fin => {
-    const celdas = lineaSopa(...inicio, ...fin);
-    inicio = null; limpiar();
-    if (!celdas) { estado.textContent = 'Las letras tienen que estar en línea recta.'; return; }
-    const i = palabraSopa(it, celdas);
-    if (i < 0) { estado.textContent = 'Esa no es una de las palabras. Prueba otra vez.'; sopa.classList.add('fallo'); setTimeout(() => sopa.classList.remove('fallo'), 400); return; }
-    if (halladas.some(h => h.i === i)) { estado.textContent = 'Esa palabra ya la tenías.'; return; }
-    const [[r1, c1], [r2, c2]] = [celdas[0], celdas[celdas.length - 1]];
-    halladas.push({ i, r1, c1, r2, c2 });
-    enviar(halladas);
-  };
-  const deEvento = e => { const b = document.elementFromPoint(e.clientX, e.clientY)?.closest('.celda'); return b && sopa.contains(b) ? [Number(b.dataset.r), Number(b.dataset.c)] : null; };
-  sopa.onpointerdown = e => {
-    const p = deEvento(e); if (!p) return;
-    e.preventDefault();
-    if (inicio && (inicio[0] !== p[0] || inicio[1] !== p[1])) return terminar(p);
-    inicio = p; arrastrando = true; marcar();
-    estado.textContent = `Has encontrado ${halladas.length} de ${total}. Ahora pulsa la última letra.`;
-  };
-  sopa.onpointermove = e => { if (arrastrando && inicio) { const p = deEvento(e); if (p) marcar(p); } };
-  sopa.onpointerup = e => {
-    if (!arrastrando) return; arrastrando = false;
-    const p = deEvento(e);
-    if (inicio && p && (p[0] !== inicio[0] || p[1] !== inicio[1])) terminar(p);
-  };
-  sopa.onpointercancel = () => { arrastrando = false; };
 }
 
 // ── Lienzo de dibujo ─────────────────────────────────────────────

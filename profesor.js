@@ -3,6 +3,7 @@ import { NOMBRE_APP } from './config.js';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, remove, onValue, serverTimestamp, query, orderByChild, limitToLast } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 import { esc, rico, conDatos, conNombres, TIPOS, nombreTipo, esActividad, esCorregible, itemPublico, comprobar, textoRespuesta, solucionTexto, generarCodigo, nuevoId, parseNum, fecha, evaluar, postsMuro, MAX_MURO, POR_PARTES, pintarPartes, solucionesHuecos, filasTabla, tieneVariantes, valores, datosTexto, fmtNum, infoEnlace, buscarEnlaces, CURSOS, CLASES, cursoDe, nombreClase, colorCurso, reducirImagen, alternativas, generarSopa, normSopa, pintarSopa } from './lib.js';
+import { crearEditor, tarjetasTipos, ICONOS } from './editor.js';
 
 const app = document.getElementById('app');
 const dlg = document.getElementById('dlg');
@@ -433,384 +434,90 @@ async function enlacesDePagina(page, p) {
 }
 
 // ── Diálogo de actividad ─────────────────────────────────────────
-const DESCRIPCION = {
-  quiz: 'Varias opciones, con o sin respuesta correcta',
-  short: 'El alumnado escribe un texto breve',
-  number: 'Un valor numérico, con unidad y tolerancia. Puede llevar datos distintos para cada alumno',
-  draw: 'Dibujan en blanco o sobre una diapositiva',
-  gaps: 'Un texto con huecos que completan',
-  match: 'Relacionan cada elemento con su pareja',
-  order: 'Colocan pasos o elementos en el orden correcto',
-  table: 'Una tabla con casillas para completar',
-  photo: 'Suben una foto o imagen, con un comentario',
-  wall: 'Todos publican textos o imágenes en un muro común',
-  label: 'Ponen nombre a las partes numeradas de una imagen',
-  memory: 'Juego de memoria: encuentran las parejas de cartas',
-  search: 'Buscan palabras en una sopa de letras'
-};
-
-// Atajos para escribir fórmulas. ‸ marca dónde queda el cursor
-const ATAJOS = [
-  ['Fórmula', '$‸$'], ['Química', '$\\ce{‸}$'], ['Fracción', '$\\frac{‸}{}$'], ['Potencia', '$x^{‸}$'],
-  ['Subíndice', '$x_{‸}$'], ['·10ⁿ', '$\\cdot 10^{‸}$'], ['Reacción', '$\\ce{‸ -> }$'], ['Equilibrio', '$\\ce{‸ <=> }$']
-];
-const AYUDA_FORMULAS = 'Escribe las fórmulas entre dólares: <code>$v = \\frac{d}{t}$</code>. Para química: <code>$\\ce{H2SO4}$</code>, <code>$\\ce{Fe^3+}$</code>, <code>$\\ce{N2 + 3H2 &lt;=&gt; 2NH3}$</code>. Debajo ves cómo queda.';
-
-// opciones.banco: el diálogo se usa desde el banco (sin «guardar también en el banco» ni fondos)
+// Editor de actividades a pantalla completa: tipos con tarjetas → formulario a la izquierda y prueba a la derecha (editor.js)
+// opciones.banco: se usa desde el banco (sin «guardar también en el banco» ni fondos). opciones.directo: durante la clase
 function dialogoActividad(item, paginas, alGuardar, opciones = {}) {
   const enBanco = !!opciones.banco;
-  let ultimoCampo = null;
+  const diapos = opciones.diapos || null;
+  const q = s => dlg.querySelector(s);
+  dlg.oncancel = e => { if (q('.dlg-editor .ed')) e.preventDefault(); };
 
   function elegirTipo() {
-    dlg.innerHTML = `<form method="dialog" class="dlg">
-      <h2>Nueva actividad</h2>
-      ${opciones.directo ? '<p class="ayuda">Se añade justo después del paso actual, solo en esta clase. Si quieres conservarla, marca «Guardar también en el banco».</p>' : ''}
-      <div class="tipos">${['quiz', 'short', 'number', 'draw', 'gaps', 'match', 'order', 'table', 'label', 'memory', 'search', 'photo', 'wall'].map(t => `<button type="button" class="tipo-btn" data-t="${t}"><strong>${TIPOS[t]}</strong><span>${DESCRIPCION[t]}</span></button>`).join('')}
-        ${enBanco ? '' : `<button type="button" class="tipo-btn" id="enlace"><strong>Enlace</strong><span>Una actividad de otra web: Wordwall, Genially, YouTube, GeoGebra…</span></button>
-        <button type="button" class="tipo-btn tipo-banco" id="desde-banco"><strong>Desde el banco</strong><span>Reutiliza preguntas que ya tienes guardadas</span></button>`}</div>
-      <div class="pie"><button class="btn" value="cancel">Cancelar</button></div></form>`;
-    dlg.querySelectorAll('[data-t]').forEach(b => b.onclick = () => formularioTipo({ type: b.dataset.t }));
-    const db_ = dlg.querySelector('#desde-banco');
-    if (db_) db_.onclick = () => elegirDelBanco(alGuardar);
-    const en = dlg.querySelector('#enlace');
-    if (en) en.onclick = () => dialogoEnlace(null, alGuardar);
+    const extra = enBanco ? [] : [
+      { id: 'enlace', nombre: 'Enlace', descripcion: 'Una actividad de otra web: Wordwall, Genially, YouTube, GeoGebra…', icono: 'link' },
+      { id: 'banco', nombre: 'Desde el banco', descripcion: 'Reutiliza preguntas que ya tienes guardadas', icono: 'banco' }];
+    dlg.innerHTML = `<div class="dlg-editor">
+      <header class="ed-cab"><h2>${enBanco ? 'Nueva pregunta' : 'Nueva actividad'}: elige el tipo</h2>
+        <div class="ed-cab-acc"><button type="button" class="btn" id="cancelar">Cancelar</button></div></header>
+      <div class="ed-tipos">
+        ${opciones.directo ? '<p class="ayuda">Se añade justo después del paso actual, solo en esta clase. Si quieres conservarla, marca «Guardar también en el banco».</p>' : ''}
+        ${tarjetasTipos(extra)}</div></div>`;
+    q('#cancelar').onclick = () => dlg.close();
+    dlg.querySelectorAll('[data-t]').forEach(b => b.onclick = () => formulario({ type: b.dataset.t }, true));
+    dlg.querySelector('[data-extra="enlace"]')?.addEventListener('click', () => dialogoEnlace(null, alGuardar));
+    dlg.querySelector('[data-extra="banco"]')?.addEventListener('click', () => elegirDelBanco(alGuardar));
   }
 
-  function filaOp(texto, i, marcada) {
-    return `<div class="op"><input type="radio" name="correcta" ${marcada ? 'checked' : ''} aria-label="Marcar como correcta">
-      <input class="op-txt" value="${esc(texto)}" placeholder="Opción ${i + 1}" maxlength="300">
-      <button type="button" class="btn-ico" data-quitar aria-label="Quitar opción">×</button></div>`;
-  }
-
-  function filaDato(v = {}) {
-    return `<div class="dato">
-      <input class="d-nom" value="${esc(v.name || '')}" placeholder="m" aria-label="Nombre del dato" maxlength="12" spellcheck="false">
-      <input class="d-min" value="${esc(v.min != null ? fmtNum(Number(v.min), 6) : '')}" placeholder="mín." aria-label="Valor mínimo" inputmode="decimal">
-      <input class="d-max" value="${esc(v.max != null ? fmtNum(Number(v.max), 6) : '')}" placeholder="máx." aria-label="Valor máximo" inputmode="decimal">
-      <input class="d-paso" value="${esc(v.step ? fmtNum(Number(v.step), 6) : '')}" placeholder="paso" aria-label="Paso entre valores" inputmode="decimal">
-      <button type="button" class="btn-ico" data-quitar-dato aria-label="Quitar dato">×</button></div>`;
-  }
-
-  function formularioTipo(base) {
+  function formulario(base, nuevo) {
     const t = base.type;
-    let campos = '';
-    if (t === 'quiz') {
-      const ops = base.options?.length ? base.options : ['', ''];
-      campos = `<fieldset class="opciones"><legend>Opciones (marca la correcta)</legend>
-        <div id="ops">${ops.map((o, i) => filaOp(o, i, !base.poll && Number(base.correct) === i)).join('')}</div>
-        <button type="button" class="btn peq" id="addop">Añadir opción</button></fieldset>
-        <label class="check"><input type="checkbox" id="encuesta" ${base.poll ? 'checked' : ''}> Es una encuesta: no hay respuesta correcta</label>`;
-    }
-    if (t === 'short') {
-      campos = `<label>Respuestas válidas (opcional)
-        <input id="aceptadas" value="${esc(base.accepted || '')}" placeholder="Por ejemplo: evaporación; vaporización">
-        <span class="ayuda">Sepáralas con punto y coma. Si las indicas, se corrige sola sin tener en cuenta mayúsculas ni tildes.</span></label>`;
-    }
-    if (t === 'number') {
-      const vars = base.vars || [];
-      campos = `<fieldset class="opciones"><legend>Datos distintos para cada alumno (opcional)</legend>
-        <p class="ayuda">Cada alumno recibe sus propios valores. Escribe <code>{{m}}</code> en el enunciado donde quieras que aparezca el dato <code>m</code>, y usa <code>m</code> en la fórmula de la solución.</p>
-        <div class="dato dato-cab" ${vars.length ? '' : 'hidden'} aria-hidden="true"><span>Nombre</span><span>Mínimo</span><span>Máximo</span><span>Paso</span><span></span></div>
-        <div id="datos">${vars.map(filaDato).join('')}</div>
-        <button type="button" class="btn peq" id="adddato">Añadir dato</button></fieldset>
-        <div class="rejilla-3">
-        <label>Solución<input id="sol" value="${esc(base.formula ?? (base.answer != null ? fmtNum(Number(base.answer), 10) : ''))}" placeholder="9,8 o m*9,8" spellcheck="false"></label>
-        <label>Tolerancia (%)<input id="tol" type="number" min="0" max="100" step="0.1" value="${esc(base.tolerance ?? 2)}"></label>
-        <label>Unidad<input id="uni" value="${esc(base.unit || '')}" placeholder="m/s^2"></label></div>
-        <span class="ayuda ayuda-sol">Con datos, la solución es una fórmula: <code>c*V/1000</code>, <code>sqrt(2*g*h)</code>, <code>-log(c)</code> (log en base 10, ln natural).</span>
-        <label class="check"><input type="checkbox" id="pedir" ${base.unitMode === 'ask' ? 'checked' : ''}> El alumnado debe escribir la unidad (si no, la ve junto a la casilla)</label>`;
-    }
-    const mayus = `<label class="check"><input type="checkbox" id="mayus" ${base.caseSensitive ? 'checked' : ''}> Distinguir mayúsculas (por ejemplo, en fórmulas: CO no es Co)</label>`;
-    if (t === 'gaps') {
-      campos = `<label>Texto con huecos<textarea id="texto-act" rows="5" maxlength="3000" spellcheck="false">${esc(base.text || '')}</textarea>
-        <span class="ayuda">Escribe la respuesta de cada hueco entre dobles corchetes: <code>El agua hierve a [[100]] °C</code>. Si valen varias, sepáralas con |: <code>[[evaporación|vaporización]]</code>. Admite fórmulas.</span></label>${mayus}`;
-    }
-    if (t === 'table') {
-      campos = `<label>Tabla<textarea id="texto-act" rows="6" maxlength="4000" spellcheck="false" placeholder="Fórmula | Nombre&#10;$\\ce{CO2}$ | [[dióxido de carbono]]&#10;[[CH4]] | metano">${esc(base.table || '')}</textarea>
-        <span class="ayuda">Una fila por línea y las celdas separadas por |. La primera fila es la cabecera. Las casillas que deben completar van entre dobles corchetes: <code>[[metano]]</code>.</span></label>${mayus}`;
-    }
-    if (t === 'match') {
-      campos = `<label>Parejas<textarea id="texto-act" rows="6" maxlength="3000" spellcheck="false" placeholder="$\\ce{NaCl}$ | cloruro de sodio&#10;$\\ce{H2SO4}$ | ácido sulfúrico">${esc((base.pairs || []).map(p => p.join(' | ')).join('\n'))}</textarea>
-        <span class="ayuda">Una pareja por línea, separada por |. A la derecha aparecerán desordenadas.</span></label>`;
-    }
-    if (t === 'order') {
-      campos = `<label>Elementos en el orden correcto<textarea id="texto-act" rows="6" maxlength="3000">${esc((base.steps || []).join('\n'))}</textarea>
-        <span class="ayuda">Uno por línea, en el orden bueno. El alumnado los verá desordenados.</span></label>`;
-    }
-    if (t === 'memory') {
-      campos = `<label>Parejas de cartas<textarea id="texto-act" rows="6" maxlength="2000" spellcheck="false" placeholder="$\\ce{CH4}$ | metano&#10;$\\ce{C2H6}$ | etano">${esc((base.pairs || []).map(p => p.join(' | ')).join('\n'))}</textarea>
-        <span class="ayuda">Una pareja por línea, separada por |: fórmula y nombre, concepto y definición… Entre 2 y 10 parejas. Ganan cuando las encuentran todas; se guardan los intentos.</span></label>`;
-    }
-    if (t === 'search') {
-      campos = `<label>Palabras<textarea id="texto-act" rows="6" maxlength="2000" spellcheck="false" placeholder="carbono&#10;alcano | Hidrocarburo con solo enlaces simples">${esc((base.words || []).map((w, i) => base.clues?.[i] ? `${w} | ${base.clues[i]}` : w).join('\n'))}</textarea>
-        <span class="ayuda">Una por línea (entre 3 y 14 letras; las tildes se quitan, la ñ se mantiene). Si después de | escribes una pista, el alumnado verá las pistas en lugar de las palabras.</span></label>
-        <label class="check"><input type="checkbox" id="inversas" ${base.reverse ? 'checked' : ''}> Más difícil: también palabras al revés</label>
-        <button type="button" class="btn peq" id="otra-sopa">Generar otra sopa</button>`;
-    }
-    if (t === 'label') {
-      const pags = opciones.diapos ? paginas.filter(p => opciones.diapos[p]) : [];
-      campos = `<fieldset class="opciones"><legend>Imagen</legend>
-        <div class="fila-botones">${pags.length ? `<label>Usar una diapositiva<select id="fondo-et"><option value="">Elige…</option>${pags.map(p => `<option value="${p}">Diapositiva ${p}</option>`).join('')}</select></label>` : ''}
-          <label class="btn elegir-foto">Subir una imagen<input type="file" id="img-et" accept="image/*" hidden></label></div>
-        <div class="img-etiquetas editor-etiquetas" id="lienzo-et"></div>
-        <p class="ayuda" id="ayuda-et"></p>
-        <ol class="lista-etiquetas" id="puntos-et"></ol></fieldset>
-        <label class="check"><input type="checkbox" id="escribir" ${base.write ? 'checked' : ''}> Que escriban el nombre (si no, lo eligen de una lista)</label>
-        <span class="ayuda">Si escriben, puedes aceptar varias respuestas separándolas con |: <code>mitocondria|mitocondrias</code>.</span>${mayus}`;
-    }
-    if (t === 'wall') {
-      campos = `<label class="check"><input type="checkbox" id="imgs" ${base.images !== false ? 'checked' : ''}> Pueden añadir una imagen a cada aportación</label>
-        <label class="check"><input type="checkbox" id="nombres" ${base.names ? 'checked' : ''}> Mostrar el nombre de cada alumno en el muro (si no, es anónimo para la clase)</label>
-        <span class="ayuda">Cada alumno puede publicar hasta ${MAX_MURO} aportaciones. El muro se ve en el proyector mientras lo van rellenando, y puedes ocultar cualquier aportación.</span>`;
-    }
-    if (t === 'draw' && !enBanco) {
-      campos = `<label>Fondo<select id="fondo"><option value="">Lienzo en blanco</option>${paginas.map(p => `<option value="${p}" ${Number(base.background) === p ? 'selected' : ''}>Diapositiva ${p}</option>`).join('')}</select></label>`;
-    }
     const desdeBanco = !!base.bankId;
-    const guardarEnBanco = enBanco ? '' : `<div class="guardar-banco">
-        <label class="check"><input type="checkbox" id="al-banco" ${desdeBanco ? 'checked' : ''}> ${desdeBanco ? 'Actualizar también la pregunta del banco' : 'Guardar también en el banco de preguntas'}</label>
-        <label class="tema-banco" ${desdeBanco ? '' : 'hidden'}>Tema o etiqueta<input id="tema" value="${esc(base.tema || '')}" placeholder="Q2B T1 Carbono" list="temas-banco" maxlength="60"></label></div>`;
-    const temaBanco = enBanco ? `<label>Tema o etiqueta<input id="tema" value="${esc(base.tema || '')}" placeholder="Q2B T1 Carbono" list="temas-banco" maxlength="60"></label>` : '';
-
-    dlg.innerHTML = `<form method="dialog" class="dlg">
-      <h2>${item ? 'Editar' : 'Nueva'} ${enBanco ? 'pregunta' : 'actividad'}: ${TIPOS[t]}</h2>
-      <label for="enun">Enunciado</label>
-      <div class="atajos" role="toolbar" aria-label="Insertar fórmulas">${ATAJOS.map(([n, x]) => `<button type="button" class="btn peq" data-atajo="${esc(x)}">${esc(n)}</button>`).join('')}
-        ${t === 'number' ? '<button type="button" class="btn peq" data-atajo="{{‸}}">Dato</button>' : ''}
-        ${t === 'gaps' || t === 'table' ? '<button type="button" class="btn peq" data-atajo="[[‸]]">Hueco</button>' : ''}</div>
-      <textarea id="enun" rows="3" maxlength="1000" required>${esc(base.prompt || '')}</textarea>
-      <span class="ayuda">${AYUDA_FORMULAS}</span>
-      <div class="vista-previa" id="vista" aria-live="polite"></div>
-      ${campos}${temaBanco}${guardarEnBanco}
-      <datalist id="temas-banco"></datalist>
-      <p class="aviso" id="err" role="alert"></p>
-      <div class="pie"><button class="btn" value="cancel">Cancelar</button><button type="button" class="btn primario" id="ok">Guardar ${enBanco ? 'pregunta' : 'actividad'}</button></div></form>`;
-
-    const q = s => dlg.querySelector(s);
-    ultimoCampo = q('#enun');
-    dlg.querySelector('form').addEventListener('focusin', e => { if (e.target.matches('#enun, .op-txt, #texto-act')) ultimoCampo = e.target; });
-    q('.atajos').onclick = e => {
-      const b = e.target.closest('[data-atajo]'); if (!b) return;
-      const c = ultimoCampo || q('#enun');
-      const [antes, despues] = b.dataset.atajo.split('‸');
-      const i = c.selectionStart ?? c.value.length, j = c.selectionEnd ?? i;
-      c.value = c.value.slice(0, i) + antes + c.value.slice(i, j) + despues + c.value.slice(j);
-      c.focus();
-      c.setSelectionRange(i + antes.length, j + antes.length);
-      vistaPrevia();
+    const campoTema = oculto => `<label class="tema-banco" ${oculto ? 'hidden' : ''}>Tema o etiqueta<input id="tema" value="${esc(base.tema || '')}" placeholder="Q2B T1 Carbono" list="temas-banco" maxlength="60"></label>`;
+    const extra = `<div class="ed-bloque guardar-banco">${enBanco ? campoTema(false)
+      : `<label class="check"><input type="checkbox" id="al-banco" ${desdeBanco ? 'checked' : ''}> ${desdeBanco ? 'Actualizar también la pregunta del banco' : 'Guardar también en el banco de preguntas'}</label>${campoTema(!desdeBanco)}`}
+      <datalist id="temas-banco"></datalist></div>`;
+    dlg.innerHTML = `<div class="dlg-editor">
+      <header class="ed-cab">
+        ${nuevo ? '<button type="button" class="btn" id="volver" aria-label="Volver a los tipos">‹ Tipos</button>' : ''}
+        <h2><span class="ed-cab-icono">${ICONOS[t] || ''}</span>${item ? 'Editar' : 'Nueva'} ${enBanco ? 'pregunta' : 'actividad'}: ${esc(TIPOS[t])}</h2>
+        <div class="ed-cab-acc"><button type="button" class="btn" id="cancelar">Cancelar</button><button type="button" class="btn primario" id="ok">Guardar</button></div>
+      </header>
+      <div class="ed-pestanas" role="tablist"><button type="button" role="tab" class="activa" data-ver="form">Editar</button><button type="button" role="tab" data-ver="prueba">Probar</button></div>
+      <div id="ed-sitio"></div></div>`;
+    const ed = crearEditor(q('#ed-sitio'), base, { paginas: enBanco ? [] : paginas, diapos, extra });
+    const enlazarExtra = () => {
+      const chk = q('#al-banco');
+      if (chk) chk.onchange = () => { q('.tema-banco').hidden = !chk.checked; };
+      temasBanco().then(ts => { const dl = q('#temas-banco'); if (dl) dl.innerHTML = ts.map(x => `<option value="${esc(x)}">`).join(''); });
     };
-
-    if (t === 'quiz') {
-      q('#addop').onclick = () => {
-        const n = q('#ops').children.length;
-        if (n >= 6) return;
-        q('#ops').insertAdjacentHTML('beforeend', filaOp('', n, false));
-      };
-      q('#ops').onclick = e => { if (e.target.closest('[data-quitar]') && q('#ops').children.length > 2) { e.target.closest('.op').remove(); vistaPrevia(); } };
-    }
-    if (t === 'number') {
-      q('#adddato').onclick = () => {
-        if (q('#datos').children.length >= 6) return;
-        q('#datos').insertAdjacentHTML('beforeend', filaDato());
-        q('.dato-cab').hidden = false;
-        q('#datos').lastElementChild.querySelector('.d-nom').focus();
-      };
-      q('#datos').onclick = e => {
-        if (!e.target.closest('[data-quitar-dato]')) return;
-        e.target.closest('.dato').remove();
-        q('.dato-cab').hidden = !q('#datos').children.length;
-        vistaPrevia();
-      };
-    }
-    // Identificar en imagen: la docente pulsa sobre la imagen para numerar las partes
-    let imgEt = base.image || '';
-    const puntos = (base.points || []).map(p => ({ ...p }));
-    const pintarEt = () => {
-      q('#lienzo-et').innerHTML = imgEt
-        ? `<img src="${esc(imgEt)}" alt="Imagen de la actividad">${puntos.map((p, i) => `<span class="marca-img" style="left:${p.x}%;top:${p.y}%">${i + 1}</span>`).join('')}`
-        : '<p class="vacio">Elige una diapositiva o sube una imagen.</p>';
-      q('#ayuda-et').textContent = imgEt ? 'Pulsa sobre la imagen en cada parte que deban identificar y escribe debajo su nombre.' : '';
-      q('#puntos-et').innerHTML = puntos.map((p, i) => `<li><span class="marca-num">${i + 1}</span><input class="et-txt" data-i="${i}" value="${esc(p.t || '')}" placeholder="Nombre de la parte ${i + 1}" maxlength="120"><button type="button" class="btn-ico" data-quitar-et="${i}" aria-label="Quitar la parte ${i + 1}">×</button></li>`).join('');
+    enlazarExtra();
+    // «Rellenar con un ejemplo» vuelve a pintar el formulario (y el bloque del banco)
+    q('#ed-sitio').addEventListener('click', e => { if (e.target.closest('#ejemplo')) setTimeout(enlazarExtra, 0); }, true);
+    // Móvil: pestañas Editar / Probar
+    const pest = q('.ed-pestanas');
+    pest.onclick = e => {
+      const b = e.target.closest('[data-ver]'); if (!b) return;
+      pest.querySelectorAll('[data-ver]').forEach(x => x.classList.toggle('activa', x === b));
+      q('.dlg-editor').classList.toggle('ver-prueba', b.dataset.ver === 'prueba');
+      if (b.dataset.ver === 'prueba') ed.probar();
     };
-    if (t === 'label') {
-      pintarEt();
-      q('#lienzo-et').onclick = e => {
-        const img = e.target.closest('#lienzo-et')?.querySelector('img'); if (!img) return;
-        const r = img.getBoundingClientRect();
-        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
-        if (puntos.length >= 15) { q('#err').textContent = 'Como mucho, 15 partes por imagen.'; return; }
-        puntos.push({ x: Math.round((e.clientX - r.left) * 1000 / r.width) / 10, y: Math.round((e.clientY - r.top) * 1000 / r.height) / 10, t: '' });
-        pintarEt();
-        q(`.et-txt[data-i="${puntos.length - 1}"]`).focus();
-      };
-      q('#puntos-et').oninput = e => { const i = e.target.dataset.i; if (i != null) puntos[i].t = e.target.value; };
-      q('#puntos-et').onclick = e => { const b = e.target.closest('[data-quitar-et]'); if (b) { puntos.splice(Number(b.dataset.quitarEt), 1); pintarEt(); vistaPrevia(); } };
-      const fs = q('#fondo-et');
-      if (fs) fs.onchange = () => { if (fs.value) { imgEt = opciones.diapos[fs.value]; pintarEt(); vistaPrevia(); } };
-      q('#img-et').onchange = async e => {
-        const f = e.target.files[0]; if (!f) return;
-        try { imgEt = await reducirImagen(f, 1280, 0.75); if (fs) fs.value = ''; pintarEt(); vistaPrevia(); }
-        catch (err) { console.error(err); q('#err').textContent = 'No se ha podido leer esa imagen.'; }
-      };
-    }
-    // Sopa de letras: se genera al guardar las palabras y se conserva hasta que cambien
-    let sopa = base.grid ? { clave: JSON.stringify([(base.words || []).map(normSopa), !!base.reverse]), grid: base.grid, placed: base.placed } : null;
-    if (t === 'search') q('#otra-sopa').onclick = () => { sopa = null; vistaPrevia(); };
-    const chk = q('#al-banco');
-    if (chk) chk.onchange = () => { q('.tema-banco').hidden = !chk.checked; };
-    temasBanco().then(ts => { const dl = q('#temas-banco'); if (dl) dl.innerHTML = ts.map(x => `<option value="${esc(x)}">`).join(''); });
-
-    // Lee el formulario. Devuelve { out } o { error }
-    function leer() {
-      const prompt = q('#enun').value.trim();
-      if (!prompt) return { error: 'Escribe el enunciado.' };
-      const out = { id: base.id || nuevoId(), type: t, prompt };
-      if (base.bankId) out.bankId = base.bankId;
-      if (t === 'quiz') {
-        const filas = [...q('#ops').children];
-        out.options = filas.map(f => f.querySelector('.op-txt').value.trim());
-        if (out.options.some(o => !o)) return { out, error: 'Rellena todas las opciones o quita las que sobren.' };
-        out.poll = q('#encuesta').checked;
-        if (!out.poll) {
-          const c = filas.findIndex(f => f.querySelector('[type=radio]').checked);
-          if (c < 0) return { out, error: 'Marca la opción correcta, o indica que es una encuesta.' };
-          out.correct = c;
-        }
-      }
-      if (t === 'short') { const a = q('#aceptadas').value.trim(); if (a) out.accepted = a; }
-      if (t === 'number') {
-        out.tolerance = Math.max(0, Number(q('#tol').value) || 0);
-        const u = q('#uni').value.trim(); if (u) out.unit = u;
-        out.unitMode = q('#pedir').checked && u ? 'ask' : 'show';
-        const vars = [];
-        for (const f of q('#datos').children) {
-          const name = f.querySelector('.d-nom').value.trim();
-          const [min, max, step] = ['.d-min', '.d-max', '.d-paso'].map(c => f.querySelector(c).value.trim());
-          if (!name && !min && !max) continue;
-          if (!/^[A-Za-z_][A-Za-z_0-9]*$/.test(name)) return { out, error: `El nombre del dato «${name}» solo puede llevar letras sin tilde, números y _, y empezar por letra.` };
-          if (['pi', 'e', 'sqrt', 'raiz', 'log', 'ln', 'exp', 'sin', 'cos', 'tan', 'abs'].includes(name)) return { out, error: `«${name}» está reservado; usa otro nombre para el dato.` };
-          if (vars.some(v => v.name === name)) return { out, error: `El dato «${name}» está repetido.` };
-          const v = { name, min: parseNum(min), max: parseNum(max) };
-          if (Number.isNaN(v.min) || Number.isNaN(v.max)) return { out, error: `Indica el mínimo y el máximo del dato «${name}» como números.` };
-          if (v.min > v.max) [v.min, v.max] = [v.max, v.min];
-          if (step) { v.step = parseNum(step); if (!(v.step > 0)) return { out, error: `El paso del dato «${name}» debe ser un número positivo.` }; }
-          vars.push(v);
-        }
-        const sol = q('#sol').value.trim();
-        if (!sol) return { out, error: 'Escribe la solución.' };
-        if (vars.length) {
-          out.vars = vars; out.formula = sol;
-          try {
-            const x = evaluar(sol, valores(out, 'prueba'));
-            if (!Number.isFinite(x)) return { out, error: 'Con estos datos la fórmula no da un número (¿división por cero o raíz de un negativo?).' };
-          } catch (e) { return { out, error: e.message }; }
-          const sinUsar = vars.filter(v => !new RegExp(`\\{\\{\\s*${v.name}\\s*\\}\\}`).test(prompt));
-          if (sinUsar.length) out.aviso = `El enunciado no muestra ${sinUsar.map(v => `{{${v.name}}}`).join(', ')}: el alumnado no verá ese dato.`;
-        } else {
-          let x = parseNum(sol);
-          if (Number.isNaN(x)) { try { x = evaluar(sol); } catch { x = NaN; } }
-          if (!Number.isFinite(x)) return { out, error: 'La solución debe ser un número (puedes usar coma decimal y 3e4 o 3·10^4). Para usar una fórmula, añade antes los datos.' };
-          out.answer = x;
-        }
-      }
-      if (t === 'gaps' || t === 'table') {
-        const txt = q('#texto-act').value.replace(/\r/g, '').trim();
-        if (t === 'gaps') out.text = txt; else out.table = txt;
-        out.caseSensitive = q('#mayus').checked;
-        const sols = solucionesHuecos(txt);
-        if (!sols.length) return { out, error: 'Marca al menos un hueco con dobles corchetes: [[respuesta]].' };
-        if (sols.some(x => !x.length)) return { out, error: 'Hay un hueco vacío: escribe la respuesta dentro de [[ ]].' };
-        if (t === 'table' && filasTabla(txt).length < 2) return { out, error: 'La tabla necesita la fila de cabecera y al menos otra fila.' };
-      }
-      if (t === 'match') {
-        const lineas = q('#texto-act').value.split('\n').map(l => l.trim()).filter(Boolean);
-        out.pairs = lineas.map(l => { const k = l.indexOf('|'); return k < 0 ? [l, ''] : [l.slice(0, k).trim(), l.slice(k + 1).trim()]; });
-        if (out.pairs.length < 2) return { out, error: 'Escribe al menos dos parejas, una por línea.' };
-        if (out.pairs.some(p => !p[0] || !p[1])) return { out, error: 'Cada línea necesita sus dos partes separadas por |.' };
-        if (new Set(out.pairs.map(p => p[1])).size < out.pairs.length) return { out, error: 'Hay dos parejas con la misma parte derecha: cámbiala para que no haya dudas.' };
-      }
-      if (t === 'order') {
-        out.steps = q('#texto-act').value.split('\n').map(l => l.trim()).filter(Boolean);
-        if (out.steps.length < 2) return { out, error: 'Escribe al menos dos elementos, uno por línea.' };
-        if (new Set(out.steps).size < out.steps.length) return { out, error: 'Hay dos elementos iguales: cámbialos para que el orden no sea ambiguo.' };
-      }
-      if (t === 'wall') { out.images = q('#imgs').checked; out.names = q('#nombres').checked; }
-      if (t === 'memory') {
-        const lineas = q('#texto-act').value.split('\n').map(l => l.trim()).filter(Boolean);
-        out.pairs = lineas.map(l => { const k = l.indexOf('|'); return k < 0 ? [l, ''] : [l.slice(0, k).trim(), l.slice(k + 1).trim()]; });
-        if (out.pairs.length < 2) return { out, error: 'Escribe al menos dos parejas, una por línea.' };
-        if (out.pairs.length > 10) return { out, error: 'Como mucho, 10 parejas (20 cartas).' };
-        if (out.pairs.some(p => !p[0] || !p[1])) return { out, error: 'Cada línea necesita sus dos partes separadas por |.' };
-      }
-      if (t === 'search') {
-        const lineas = q('#texto-act').value.split('\n').map(l => l.trim()).filter(Boolean);
-        out.words = []; out.clues = [];
-        for (const l of lineas) { const k = l.indexOf('|'); out.words.push((k < 0 ? l : l.slice(0, k)).trim()); out.clues.push(k < 0 ? '' : l.slice(k + 1).trim()); }
-        if (!out.clues.some(Boolean)) delete out.clues;
-        out.reverse = q('#inversas').checked;
-        const norm = out.words.map(normSopa);
-        if (norm.length < 2) return { out, error: 'Escribe al menos dos palabras, una por línea.' };
-        if (norm.length > 15) return { out, error: 'Como mucho, 15 palabras.' };
-        const mal = out.words.find((w, i) => norm[i].length < 3 || norm[i].length > 14);
-        if (mal != null) return { out, error: `«${mal}» debe tener entre 3 y 14 letras.` };
-        if (new Set(norm).size < norm.length) return { out, error: 'Hay palabras repetidas.' };
-        const clave = JSON.stringify([norm, out.reverse]);
-        if (sopa?.clave !== clave) { const g = generarSopa(out.words, { inversas: out.reverse }); if (!g) return { out, error: 'No caben todas las palabras: quita alguna o acórtalas.' }; sopa = { clave, ...g }; }
-        out.grid = sopa.grid; out.placed = sopa.placed;
-      }
-      if (t === 'label') {
-        if (!imgEt) return { out, error: 'Elige una diapositiva o sube una imagen.' };
-        out.image = imgEt;
-        out.points = puntos.map(p => ({ x: p.x, y: p.y, t: String(p.t || '').trim() }));
-        out.write = q('#escribir').checked;
-        out.caseSensitive = q('#mayus').checked;
-        if (!out.points.length) return { out, error: 'Pulsa sobre la imagen para marcar al menos una parte.' };
-        if (out.points.some(p => !alternativas(p.t).length)) return { out, error: 'Escribe el nombre de cada parte marcada.' };
-      }
-      if (t === 'draw' && !enBanco) { const f = q('#fondo').value; if (f) out.background = Number(f); }
-      const tema = q('#tema')?.value.trim(); if (tema) out.tema = tema;
-      return { out };
-    }
-
-    function vistaPrevia() {
-      const { out, error } = leer();
-      const el = q('#vista');
-      if (!out) { el.innerHTML = ''; return; }
-      let html = `<p class="tipo">Así lo verá un alumno${tieneVariantes(out) ? ' (ejemplo con datos al azar)' : ''}</p><p class="enunciado-previa">${rico(conDatos(out.prompt, out, 'ejemplo'))}</p>`;
-      if (t === 'quiz') html += `<ol class="ops-previa">${out.options.map((o, i) => `<li class="${!out.poll && out.correct === i ? 'correcta' : ''}">${rico(o) || '…'}</li>`).join('')}</ol>`;
-      if (t === 'search' && !error) html += `<div class="previa-partes">${pintarSopa(out, [], { conSolucion: true })}</div><p class="meta">Las palabras están marcadas con borde para que veas dónde quedan; el alumnado no lo ve.</p>`;
-      if (t === 'memory' && !error) html += `<p class="meta">${out.pairs.length * 2} cartas, que se barajan para cada alumno.</p>`;
-      if (POR_PARTES.includes(t) && t !== 'label' && !error) html += `<div class="previa-partes">${pintarPartes(itemPublico(out), [], { editable: true })}</div>`;
-      if (t === 'number' && !error) {
-        html += `<p class="meta">Solución${tieneVariantes(out) ? ' para este alumno' : ''}: <strong>${esc(solucionTexto(out, 'ejemplo'))}</strong></p>`;
-        if (out.aviso) html += `<p class="aviso">${esc(out.aviso)}</p>`;
-      }
-      el.innerHTML = html;
-    }
-    let temporizador = null;
-    dlg.querySelector('form').addEventListener('input', () => { clearTimeout(temporizador); temporizador = setTimeout(vistaPrevia, 150); });
-    vistaPrevia();
-
+    if (q('#volver')) q('#volver').onclick = elegirTipo;
+    q('#cancelar').onclick = () => dlg.close();
     q('#ok').onclick = async () => {
-      const { out, error } = leer();
-      if (error) { q('#err').textContent = error; return; }
-      delete out.aviso;
+      const err = q('#ed-err');
+      const { out, error } = ed.leer();
+      if (error) {
+        err.textContent = error;
+        if (q('.dlg-editor').classList.contains('ver-prueba')) pest.querySelector('[data-ver="form"]').click();
+        err.scrollIntoView({ block: 'nearest' });
+        return;
+      }
+      const tema = q('#tema')?.value.trim();
+      if (tema) out.tema = tema; else delete out.tema;
       if (enBanco || q('#al-banco')?.checked) {
         const bid = enBanco ? out.id : (out.bankId || nuevoId());
         const copia = { ...out, id: bid, updatedAt: serverTimestamp() };
         delete copia.bankId; delete copia.background;
         try { await set(ref(db, `bank/${U.uid}/${bid}`), copia); }
-        catch (e) { console.error(e); q('#err').textContent = 'No se ha podido guardar en el banco. ¿Has pegado las reglas nuevas de database.rules.json en Firebase?'; return; }
+        catch (e) { console.error(e); err.textContent = 'No se ha podido guardar en el banco. ¿Has pegado las reglas nuevas de database.rules.json en Firebase?'; return; }
         if (!enBanco) out.bankId = bid;
       }
       dlg.close();
       alGuardar(out);
     };
-    if (!dlg.open) dlg.showModal();
   }
 
   if (item?.type === 'link') return dialogoEnlace(item, alGuardar);
-  if (item) formularioTipo(item); else elegirTipo();
+  if (item) formulario(item, false); else elegirTipo();
   if (!dlg.open) dlg.showModal();
 }
 

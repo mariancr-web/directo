@@ -108,9 +108,17 @@ Lo normal sigue siendo entrar con la cuenta del colegio. En el directo, el botó
 - No se comprueba quién es: el nombre lo escribe el alumno. En el directo y en el informe aparece como «sin cuenta».
 - Útil si un alumno no puede entrar con Google o mientras el coordinador TIC no haya autorizado la app.
 
+### Crear actividades (editor visual, noviembre 2026)
+Al pulsar «Añadir» se abre el editor a pantalla completa.
+1. Eliges el tipo en una tarjeta.
+2. Rellenas el formulario de la izquierda, sin símbolos: «Añadir opción», el círculo de la correcta, doble clic en una palabra para «Hacer hueco», casillas «hueco» en la tabla, o clic en la imagen para numerar partes.
+3. A la derecha la pruebas como un alumno, con «Comprobar».
+
+En cada tipo hay un botón «Rellenar con un ejemplo». En «Más opciones» puedes indicar el apartado de los apuntes. En el móvil se cambia entre Editar y Probar con las pestañas.
+
 ### Para actualizar la web publicada
 1. En Firebase, **Realtime Database → Reglas**, pega el `database.rules.json` nuevo y pulsa **Publicar** (añade el banco de preguntas).
-2. En GitHub, en el repositorio de la web, **Add file → Upload files** y sube: `index.html`, `profesor.html`, `alumno.js`, `profesor.js`, `lib.js`, `estilos.css`, `database.rules.json`, `logo.svg`, `logo-negativo.svg` y `simbolo.svg`. `config.js` y `firebase.js` no cambian.
+2. En GitHub, en el repositorio de la web, **Add file → Upload files** y sube: `index.html`, `profesor.html`, `alumno.js`, `profesor.js`, `editor.js`, `lib.js`, `estilos.css`, `database.rules.json`, `logo.svg`, `logo-negativo.svg` y `simbolo.svg`. `config.js` y `firebase.js` no cambian.
 
 ## Privacidad
 

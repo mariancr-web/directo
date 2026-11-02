@@ -630,3 +630,72 @@ body:has(.mcr-acceso) {
 .mcr-hero .cab-bloque h1 { margin: 0; }
 
 .hero-inicio .mcr-filtros { margin-bottom: 1.5rem; }
+
+/* ── Editor de actividades a pantalla completa (editor.js) ───────── */
+dialog:has(.dlg-editor) { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; background: var(--papel-alto); }
+.dlg-editor { display: flex; flex-direction: column; height: 100%; }
+.ed-cab { display: flex; align-items: center; gap: .75rem; padding: .7rem 1.25rem; background: #1E293B; color: #F1F5F9; flex-wrap: wrap; }
+.ed-cab h2 { flex: 1; margin: 0; font-family: var(--font-marca); font-size: 1.15rem; display: flex; align-items: center; gap: .5rem; min-width: 12rem; }
+.ed-cab-icono { display: inline-flex; color: var(--acento); }
+.ed-cab-icono svg { width: 24px; height: 24px; }
+.ed-cab-acc { display: flex; gap: .5rem; }
+.ed-cab .btn:not(.primario) { background: transparent; color: #F1F5F9; border-color: rgba(241, 245, 249, .4); }
+.ed-tipos { flex: 1; overflow: auto; padding: 1.25rem; max-width: 72rem; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.grupo-tipos h3 { font-family: var(--font-marca); font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-suave); margin: 1.1rem 0 .5rem; }
+.tipos-rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); gap: .75rem; }
+.tipo-tarjeta { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto 1fr; column-gap: .75rem; row-gap: .15rem; text-align: left; padding: .85rem 1rem; background: var(--papel); color: var(--tinta); border: 1px solid var(--linea); border-left: 4px solid var(--acento); border-radius: var(--radio); cursor: pointer; font: inherit; }
+.tipo-tarjeta:hover, .tipo-tarjeta:focus-visible { border-color: var(--acento); box-shadow: 0 4px 14px color-mix(in srgb, var(--tinta) 12%, transparent); }
+.tipo-icono { grid-row: 1 / 3; color: var(--texto); display: flex; align-items: flex-start; padding-top: .1rem; }
+.tipo-tarjeta strong { font-family: var(--font-marca); font-size: 1.02rem; }
+.tipo-tarjeta > span:last-child { font-size: .88rem; color: var(--tinta-suave); line-height: 1.35; }
+#ed-sitio { flex: 1; min-height: 0; }
+.ed-raiz { height: 100%; }
+.ed { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: 100%; }
+.ed-form { overflow: auto; padding: 1.25rem 1.5rem 3rem; display: flex; flex-direction: column; gap: 1rem; }
+.ed-prueba { display: flex; flex-direction: column; min-height: 0; background: var(--papel); border-left: 1px solid var(--linea); }
+.ed-prueba-cab { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: .6rem 1.25rem; border-bottom: 1px solid var(--linea); font-family: var(--font-marca); font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-suave); }
+.ed-prueba-cuerpo { flex: 1; overflow: auto; padding: 1.25rem 1.5rem 3rem; display: flex; flex-direction: column; gap: 1rem; }
+.ed-bloque { background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio); padding: .9rem 1rem; display: flex; flex-direction: column; gap: .6rem; }
+.ed-form label { margin: 0; }
+.ed-bloque > label:not(.check):not(.btn) { display: flex; flex-direction: column; gap: .3rem; }
+.ed-form > label.check, .ed-form > .ayuda { margin: -.4rem 0 0; }
+.ed-titulo { font-family: var(--font-marca); font-weight: 700; margin: 0; }
+.ed-ejemplo { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; padding: .6rem 1rem; background: var(--suave); border-left: 4px solid var(--acento); border-radius: var(--radio); }
+.ed-atajos { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; margin-top: -.4rem; }
+.ed-lista { display: flex; flex-direction: column; gap: .4rem; counter-reset: fila; }
+.ed-fila { display: flex; gap: .4rem; align-items: center; counter-increment: fila; }
+.ed-num::before { content: counter(fila); display: inline-block; min-width: 1.6em; text-align: center; font-family: var(--font-marca); font-weight: 700; color: var(--tinta-suave); }
+.ed-celda { flex: 1; min-width: 0; }
+.ed-correcta input { width: 1.25rem; height: 1.25rem; accent-color: var(--ok); }
+.ed-anadir, .ed-bloque > .btn { align-self: flex-start; }
+.ed-barra { display: flex; gap: .4rem; flex-wrap: wrap; }
+.ed-huecos { margin: 0; padding-left: 1.4rem; display: flex; flex-direction: column; gap: .4rem; }
+.ed-huecos li { display: grid; grid-template-columns: minmax(4rem, max-content) 1fr; gap: .5rem; align-items: center; }
+.ed-huecos .hueco-sol { justify-self: start; }
+.ed-huecos .ed-alt { flex: 1; min-width: 0; }
+.ed-tabla { border-collapse: collapse; width: 100%; }
+.ed-tabla td { border: 1px solid var(--linea); padding: .3rem; vertical-align: top; min-width: 7rem; }
+.ed-tabla td.cab { background: var(--papel-alto); }
+.ed-tabla td.cab .ed-tc { font-weight: 700; }
+.ed-tabla td.hueco-sel { background: var(--suave); }
+.ed-tc { width: 100%; box-sizing: border-box; }
+.ed-h { display: flex; align-items: center; gap: .3rem; font-size: .8rem; color: var(--tinta-suave); margin-top: .2rem; }
+.ed-tabla-acc { display: flex; gap: .4rem; flex-wrap: wrap; }
+.ed-mas summary { cursor: pointer; color: var(--tinta-suave); font-family: var(--font-marca); }
+.ed-mas label { display: flex; flex-direction: column; gap: .3rem; margin-top: .5rem; }
+.ed-falta { padding: .75rem 1rem; border: 1px dashed var(--linea); border-radius: var(--radio); color: var(--tinta-suave); }
+.ed-nota { display: flex; gap: .75rem; align-items: flex-start; padding: 1rem; background: var(--papel-alto); border-radius: var(--radio); color: var(--tinta-suave); }
+.ed-nota svg { flex: none; color: var(--texto); }
+.ed-nota p { margin: 0; }
+.ed-pestanas { display: none; }
+@media (max-width: 52rem) {
+  .ed { grid-template-columns: 1fr; }
+  .ed-prueba { border-left: none; display: none; }
+  .ver-prueba .ed-prueba { display: flex; }
+  .ver-prueba .ed-form { display: none; }
+  .ed-pestanas { display: flex; background: var(--papel); border-bottom: 1px solid var(--linea); }
+  .ed-pestanas button { flex: 1; padding: .7rem; border: none; background: none; font: inherit; font-family: var(--font-marca); font-weight: 600; color: var(--tinta-suave); border-bottom: 3px solid transparent; cursor: pointer; }
+  .ed-pestanas button.activa { color: var(--tinta); border-bottom-color: var(--acento); }
+  .ed-form, .ed-prueba-cuerpo { padding: 1rem; }
+  .ed-cab { padding: .6rem 1rem; }
+}

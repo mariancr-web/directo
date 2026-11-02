@@ -326,7 +326,8 @@ export const sinSoluciones = t => String(t ?? '').replace(RE_HUECO, '[[]]');
 export const solucionesHuecos = t => [...String(t ?? '').matchAll(RE_HUECO)].map(m => m[1].split('|').map(x => x.trim()).filter(Boolean));
 // Trozos de texto entre huecos: n huecos → n + 1 trozos
 export const trozosHuecos = t => String(t ?? '').split(/\[\[.*?\]\]/);
-export const filasTabla = t => String(t ?? '').split('\n').map(l => l.trim()).filter(Boolean).map(l => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim()));
+// Separa las celdas por | sin romper los huecos con varias respuestas: [[a|b]]
+export const filasTabla = t => String(t ?? '').split('\n').map(l => l.trim()).filter(Boolean).map(l => l.replace(/^\||\|$/g, '').split(/\|(?![^[]*\]\])/).map(c => c.trim()));
 
 export function barajar(a, distinto = false) {
   const b = [...a];
@@ -554,6 +555,75 @@ export async function reducirImagen(file, max, calidad) {
   } finally { URL.revokeObjectURL(url); }
 }
 
+
+// ── Memory ───────────────────────────────────────────────────────
+// alTerminar recibe { hecho, intentos, seg }
+export function jugarMemory(el, it, alTerminar) {
+  const cartas = it.cards || [], total = cartas.length / 2;
+  const inicio = Date.now();
+  let abiertas = [], hechas = 0, intentos = 0, bloqueo = false;
+  const marcador = () => { el.querySelector('#marcador').textContent = `Parejas: ${hechas} de ${total} · Intentos: ${intentos}`; };
+  el.querySelector('.memory').onclick = e => {
+    const b = e.target.closest('.carta');
+    if (!b || bloqueo || b.classList.contains('vuelta') || b.classList.contains('hecha')) return;
+    b.classList.add('vuelta'); abiertas.push(b);
+    if (abiertas.length < 2) return;
+    intentos++;
+    const [a, c] = abiertas; abiertas = [];
+    if (cartas[a.dataset.j].k === cartas[c.dataset.j].k) {
+      a.classList.add('hecha'); c.classList.add('hecha'); hechas++;
+      marcador();
+      if (hechas === total) { setTimeout(() => alTerminar({ hecho: true, intentos, seg: Math.round((Date.now() - inicio) / 1000) }), 700); }
+    } else {
+      marcador(); bloqueo = true;
+      setTimeout(() => { a.classList.remove('vuelta'); c.classList.remove('vuelta'); bloqueo = false; }, 1100);
+    }
+  };
+}
+
+// ── Sopa de letras: pulsar primera y última letra, o arrastrar ───
+// alEncontrar recibe la lista de palabras halladas [{ i, r1, c1, r2, c2 }]
+export function jugarSopa(el, it, mia, alEncontrar) {
+  const sopa = el.querySelector('.sopa');
+  const estado = el.querySelector('#estado-sopa');
+  const halladas = [...lista(mia)];
+  const total = (it.words || it.h || []).length;
+  let inicio = null, arrastrando = false;
+  const celda = (r, c) => sopa.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+  const limpiar = () => sopa.querySelectorAll('.marcando, .inicio').forEach(x => x.classList.remove('marcando', 'inicio'));
+  const marcar = fin => {
+    limpiar();
+    if (!inicio) return;
+    celda(...inicio).classList.add('inicio');
+    if (fin) (lineaSopa(...inicio, ...fin) || []).forEach(([r, c]) => celda(r, c)?.classList.add('marcando'));
+  };
+  const terminar = fin => {
+    const celdas = lineaSopa(...inicio, ...fin);
+    inicio = null; limpiar();
+    if (!celdas) { estado.textContent = 'Las letras tienen que estar en línea recta.'; return; }
+    const i = palabraSopa(it, celdas);
+    if (i < 0) { estado.textContent = 'Esa no es una de las palabras. Prueba otra vez.'; sopa.classList.add('fallo'); setTimeout(() => sopa.classList.remove('fallo'), 400); return; }
+    if (halladas.some(h => h.i === i)) { estado.textContent = 'Esa palabra ya la tenías.'; return; }
+    const [[r1, c1], [r2, c2]] = [celdas[0], celdas[celdas.length - 1]];
+    halladas.push({ i, r1, c1, r2, c2 });
+    alEncontrar(halladas);
+  };
+  const deEvento = e => { const b = document.elementFromPoint(e.clientX, e.clientY)?.closest('.celda'); return b && sopa.contains(b) ? [Number(b.dataset.r), Number(b.dataset.c)] : null; };
+  sopa.onpointerdown = e => {
+    const p = deEvento(e); if (!p) return;
+    e.preventDefault();
+    if (inicio && (inicio[0] !== p[0] || inicio[1] !== p[1])) return terminar(p);
+    inicio = p; arrastrando = true; marcar();
+    estado.textContent = `Has encontrado ${halladas.length} de ${total}. Ahora pulsa la última letra.`;
+  };
+  sopa.onpointermove = e => { if (arrastrando && inicio) { const p = deEvento(e); if (p) marcar(p); } };
+  sopa.onpointerup = e => {
+    if (!arrastrando) return; arrastrando = false;
+    const p = deEvento(e);
+    if (inicio && p && (p[0] !== inicio[0] || p[1] !== inicio[1])) terminar(p);
+  };
+  sopa.onpointercancel = () => { arrastrando = false; };
+}
 
 // Color de toda la página según el curso (guía de webs y herramientas)
 export function colorCurso(curso) {
