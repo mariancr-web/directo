@@ -1,6 +1,6 @@
 /* Clase en directo · estilos propios. Tokens y componentes comunes: mariancr.css (se carga antes). */
 :root {
-  /* Colores y fuentes: vienen de la hoja común mariancr.css (mariancr-marca.vercel.app).
+  /* Colores y fuentes: vienen de la hoja común mariancr.css (marca.mariancr.es).
      Aquí solo quedan los alias propios de esta web. */
   --azul: var(--acento);
   --azul-hondo: var(--texto);
