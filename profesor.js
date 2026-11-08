@@ -323,9 +323,12 @@ async function vistaEditor(id) {
     app.innerHTML = marco(`
     <section class="editor">
       <div class="cab-editor hero">
-        <input id="titulo" class="titulo-input" value="${esc(L.title)}" aria-label="Título de la lección" maxlength="120">
-        <select id="curso" class="sel-curso" aria-label="Curso de la lección"><option value="">Sin curso</option>${CURSOS.map(c => `<option value="${c.id}" ${L.curso === c.id ? 'selected' : ''}>${esc(c.nombre)} · ${esc(c.materia)}</option>`).join('')}</select>
+        <div class="cab-editor-fila">
+          <input id="titulo" class="titulo-input" value="${esc(L.title)}" aria-label="Título de la lección" maxlength="120">
+          <select id="curso" class="sel-curso" aria-label="Curso de la lección"><option value="">Sin curso</option>${CURSOS.map(c => `<option value="${c.id}" ${L.curso === c.id ? 'selected' : ''}>${esc(c.nombre)} · ${esc(c.materia)}</option>`).join('')}</select>
+        </div>
         <div class="acciones">
+          <a class="btn" href="#/" title="Volver a todas las lecciones">‹ Lecciones</a>
           <label class="btn">${Object.keys(diapos).length ? 'Reemplazar PDF' : 'Subir PDF'}<input type="file" id="pdf" accept="application/pdf" hidden></label>
           <button class="btn primario" id="empezar" ${items.length ? '' : 'disabled'}>Empezar clase</button>
         </div>
@@ -804,6 +807,7 @@ async function vistaDirecto(code) {
         <p class="meta">El alumnado entra en <a href="${enlace}" target="_blank" rel="noopener">${esc(enlaceCorto(enlace))}</a> con el código</p></div>
       <div class="codigo-grande" aria-label="Código de la clase">${code}</div>
       <div class="acciones">
+        <a class="btn" href="#/" title="Volver a todas las lecciones. La clase sigue en marcha: vuelves con «Volver al directo»">‹ Lecciones</a>
         <button class="btn" id="vercodigo">Código en el proyector</button>
         <button class="btn" id="invitados" aria-pressed="false">Permitir entrar sin cuenta</button>
         <a class="btn" href="#/proyectar/${code}" target="_blank" rel="noopener">Abrir vista para proyectar</a>
