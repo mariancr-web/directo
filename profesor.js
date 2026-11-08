@@ -808,16 +808,28 @@ async function vistaDirecto(code) {
       <div class="codigo-grande" aria-label="Código de la clase">${code}</div>
       <div class="acciones">
         <a class="btn" href="#/" title="Volver a todas las lecciones. La clase sigue en marcha: vuelves con «Volver al directo»">‹ Lecciones</a>
-        <a class="btn" href="#/proyectar/${code}" target="_blank" rel="noopener">Abrir vista para proyectar</a>
         <details class="mas-opciones">
-          <summary class="btn">Más opciones <span aria-hidden="true">▾</span></summary>
+          <summary class="btn" id="acceso-resumen">Acceso <span aria-hidden="true">▾</span></summary>
           <div class="mas-menu">
-            <button class="btn" id="vercodigo">Código en el proyector</button>
+            <p class="mas-nota">El alumnado entra siempre con su cuenta del colegio.</p>
             <button class="btn" id="invitados" aria-pressed="false">Permitir entrar sin cuenta</button>
-            <button class="btn" id="actualizar" title="Trae los cambios que hayas hecho en la lección. Se conservan las respuestas y las actividades añadidas en el directo.">Actualizar con la lección</button>
-            <a class="btn" href="#/informe/${code}">Informe</a>
           </div>
         </details>
+        <details class="mas-opciones">
+          <summary class="btn">Presentar <span aria-hidden="true">▾</span></summary>
+          <div class="mas-menu">
+            <a class="btn" href="#/proyectar/${code}" target="_blank" rel="noopener">Abrir vista para proyectar</a>
+            <button class="btn" id="vercodigo">Código en el proyector</button>
+          </div>
+        </details>
+        <details class="mas-opciones">
+          <summary class="btn">Edición <span aria-hidden="true">▾</span></summary>
+          <div class="mas-menu">
+            <a class="btn" href="#/leccion/${priv.lessonId}">Editar la lección</a>
+            <button class="btn" id="actualizar" title="Trae los cambios que hayas hecho en la lección. Se conservan las respuestas y las actividades añadidas en el directo.">Actualizar con la lección</button>
+          </div>
+        </details>
+        <a class="btn" href="#/informe/${code}">Informe</a>
         <button class="btn peligro" id="finalizar">Finalizar clase</button>
       </div>
     </div>
@@ -831,9 +843,12 @@ async function vistaDirecto(code) {
     <ol class="tira" id="tira" aria-label="Recorrido de la lección"></ol>
   </section>`);
 
-  const mas = $('.mas-opciones');
-  mas.querySelector('.mas-menu').addEventListener('click', e => { if (e.target.closest('.btn')) mas.open = false; });
-  const cerrarMas = e => { if (mas.open && !mas.contains(e.target)) mas.open = false; };
+  const menus = [...app.querySelectorAll('.mas-opciones')];
+  menus.forEach(m => {
+    m.querySelector('.mas-menu').addEventListener('click', e => { if (e.target.closest('.btn')) m.open = false; });
+    m.addEventListener('toggle', () => { if (m.open) menus.forEach(o => { if (o !== m) o.open = false; }); });
+  });
+  const cerrarMas = e => menus.forEach(m => { if (m.open && !m.contains(e.target)) m.open = false; });
   document.addEventListener('click', cerrarMas);
   alSalir(() => document.removeEventListener('click', cerrarMas));
   const C = controlSesion(code, items, motivo => {
@@ -884,6 +899,7 @@ async function vistaDirecto(code) {
     inv.classList.toggle('activo-invitados', !!C.ses.guests);
     inv.setAttribute('aria-pressed', String(!!C.ses.guests));
     inv.disabled = fin;
+    $('#acceso-resumen').innerHTML = `${C.ses.guests ? 'Acceso: con y sin cuenta' : 'Acceso: con cuenta'} <span aria-hidden="true">▾</span>`;
   }
 
   function pintarRoster() {

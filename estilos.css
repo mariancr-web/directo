@@ -711,3 +711,4 @@ dialog:has(.dlg-editor) { width: 100vw; max-width: 100vw; height: 100dvh; max-he
 .mas-menu { position: absolute; z-index: 20; top: calc(100% + .35rem); left: 0; min-width: 15rem; display: flex; flex-direction: column; gap: .25rem; padding: .4rem; background: #1E293B; border: 1px solid rgba(255, 255, 255, .25); border-radius: 8px; box-shadow: 0 12px 30px rgba(0, 0, 0, .35); }
 .hero .mas-menu .btn { justify-content: flex-start; border-color: transparent; width: 100%; }
 .hero .mas-menu .btn:hover { border-color: rgba(255, 255, 255, .4); }
+.mas-nota { margin: .2rem .6rem .35rem; font-size: .85rem; color: rgba(255, 255, 255, .7); }
