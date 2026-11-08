@@ -703,3 +703,11 @@ dialog:has(.dlg-editor) { width: 100vw; max-width: 100vw; height: 100dvh; max-he
   .ed-cab { padding: .6rem 1rem; }
 }
 .hero .acciones .btn { padding: .5rem .8rem; }
+
+/* Menú «Más opciones» del directo */
+.mas-opciones { position: relative; }
+.mas-opciones summary { list-style: none; }
+.mas-opciones summary::-webkit-details-marker { display: none; }
+.mas-menu { position: absolute; z-index: 20; top: calc(100% + .35rem); left: 0; min-width: 15rem; display: flex; flex-direction: column; gap: .25rem; padding: .4rem; background: #1E293B; border: 1px solid rgba(255, 255, 255, .25); border-radius: 8px; box-shadow: 0 12px 30px rgba(0, 0, 0, .35); }
+.hero .mas-menu .btn { justify-content: flex-start; border-color: transparent; width: 100%; }
+.hero .mas-menu .btn:hover { border-color: rgba(255, 255, 255, .4); }

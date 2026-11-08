@@ -808,11 +808,16 @@ async function vistaDirecto(code) {
       <div class="codigo-grande" aria-label="Código de la clase">${code}</div>
       <div class="acciones">
         <a class="btn" href="#/" title="Volver a todas las lecciones. La clase sigue en marcha: vuelves con «Volver al directo»">‹ Lecciones</a>
-        <button class="btn" id="vercodigo">Código en el proyector</button>
-        <button class="btn" id="invitados" aria-pressed="false">Permitir entrar sin cuenta</button>
         <a class="btn" href="#/proyectar/${code}" target="_blank" rel="noopener">Abrir vista para proyectar</a>
-        <a class="btn" href="#/informe/${code}">Informe</a>
-        <button class="btn" id="actualizar" title="Trae los cambios que hayas hecho en la lección. Se conservan las respuestas y las actividades añadidas en el directo.">Actualizar con la lección</button>
+        <details class="mas-opciones">
+          <summary class="btn">Más opciones <span aria-hidden="true">▾</span></summary>
+          <div class="mas-menu">
+            <button class="btn" id="vercodigo">Código en el proyector</button>
+            <button class="btn" id="invitados" aria-pressed="false">Permitir entrar sin cuenta</button>
+            <button class="btn" id="actualizar" title="Trae los cambios que hayas hecho en la lección. Se conservan las respuestas y las actividades añadidas en el directo.">Actualizar con la lección</button>
+            <a class="btn" href="#/informe/${code}">Informe</a>
+          </div>
+        </details>
         <button class="btn peligro" id="finalizar">Finalizar clase</button>
       </div>
     </div>
@@ -826,6 +831,11 @@ async function vistaDirecto(code) {
     <ol class="tira" id="tira" aria-label="Recorrido de la lección"></ol>
   </section>`);
 
+  const mas = $('.mas-opciones');
+  mas.querySelector('.mas-menu').addEventListener('click', e => { if (e.target.closest('.btn')) mas.open = false; });
+  const cerrarMas = e => { if (mas.open && !mas.contains(e.target)) mas.open = false; };
+  document.addEventListener('click', cerrarMas);
+  alSalir(() => document.removeEventListener('click', cerrarMas));
   const C = controlSesion(code, items, motivo => {
     if (motivo === 'items') { const t = $('#tira'); if (t) t.dataset.hecha = ''; const a = $('#actual'); if (a) a.dataset.k = ''; }
     if (motivo === 'sesion' || motivo === 'items') { pintarControles(); pintarTira(); }
