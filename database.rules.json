@@ -47,6 +47,12 @@
         ".write": "auth != null && root.child('teachers').child(auth.uid).val() === true && (!data.exists() || data.child('owner').val() === auth.uid) && (!newData.exists() || newData.child('owner').val() === auth.uid)"
       }
     },
+    "liveSessions": {
+      ".read": "auth != null && (auth.token.email_verified === true && auth.token.email.matches(/.*@nervion\\.salesianas\\.org$/) || root.child('teachers').child(auth.uid).val() === true)",
+      "$code": {
+        ".write": "auth != null && root.child('teachers').child(auth.uid).val() === true && (!data.exists() || data.child('owner').val() === auth.uid) && (!newData.exists() || newData.child('owner').val() === auth.uid)"
+      }
+    },
     "roster": {
       "$code": {
         ".read": "auth != null && root.child('sessions').child($code).child('owner').val() === auth.uid",

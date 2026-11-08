@@ -2,7 +2,7 @@ import { auth, db, configurado, enApp } from './firebase.js';
 import { NOMBRE_APP, DOMINIO_ALUMNADO } from './config.js';
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, onValue, onDisconnect, serverTimestamp, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-import { esc, rico, conDatos, esActividad, infoEnlace, lista, MAX_MURO, POR_PARTES, pintarPartes, leerPartes, moverOrden, aciertosPorParte, reducirImagen, colorCurso, pintarSopa, jugarMemory, jugarSopa, lineaSopa, palabraSopa, nombreTipo, comprobar, respuestaHTML, solucionTexto, esCorregible } from './lib.js';
+import { esc, rico, nombreClase, conDatos, esActividad, infoEnlace, lista, MAX_MURO, POR_PARTES, pintarPartes, leerPartes, moverOrden, aciertosPorParte, reducirImagen, colorCurso, pintarSopa, jugarMemory, jugarSopa, lineaSopa, palabraSopa, nombreTipo, comprobar, respuestaHTML, solucionTexto, esCorregible } from './lib.js';
 
 const app = document.getElementById('app');
 const S = { code: null, alias: '', uid: null, session: null, slides: {}, resp: null, respItem: null, respUnsub: null, key: '', invitado: false };
@@ -18,9 +18,31 @@ async function iniciarSesion() {
   else await signInWithPopup(auth, prov);
 }
 
+const leerUltima = () => { try { return localStorage.getItem('cd-ultima-clase') || ''; } catch { return ''; } };
+
+// Clases en curso: botones para entrar sin escribir el código
+async function clasesEnCurso(caja) {
+  let lista = [];
+  try { lista = Object.entries((await get(ref(db, 'liveSessions'))).val() || {}); } catch { return; }
+  const limite = Date.now() - 12 * 3600e3;
+  lista = lista.filter(([, s]) => !s.startedAt || s.startedAt > limite).sort((a, b) => (b[1].startedAt || 0) - (a[1].startedAt || 0));
+  if (!lista.length || !caja.isConnected) return;
+  caja.innerHTML = `<p class="en-curso-titulo">Clases en curso ahora</p>` + lista.map(([c, s]) => `
+    <button type="button" class="en-curso-btn" data-c="${esc(c)}">
+      <span class="en-curso-btn__titulo">${esc(s.lessonTitle || 'Clase')}</span>
+      <span class="en-curso-btn__meta">${esc(s.curso ? nombreClase(s.curso, s.grupo) : '')}${s.curso ? ' · ' : ''}código ${esc(c)}</span>
+    </button>`).join('');
+  caja.hidden = false;
+  caja.onclick = async e => {
+    const b = e.target.closest('.en-curso-btn'); if (!b) return;
+    b.disabled = true;
+    try { await entrar(b.dataset.c); } catch (err) { console.error(err); pantallaEntrada('No se ha podido entrar. Comprueba tu conexión e inténtalo de nuevo.'); }
+  };
+}
+
 // ── Pantalla de entrada ─────────────────────────────────────────
 function pantallaEntrada(msg = '') {
-  const code = (new URLSearchParams(location.search).get('c') || S.code || '').toUpperCase();
+  const code = (new URLSearchParams(location.search).get('c') || S.code || leerUltima() || '').toUpperCase();
   const u = auth.currentUser;
   const conectado = dominioOk(u);
   app.innerHTML = `
@@ -32,6 +54,7 @@ function pantallaEntrada(msg = '') {
     <form id="f" class="formulario" autocomplete="off">
       <p class="cuenta">Has entrado como <strong>${esc(nombreVisible(u))}</strong><br><span class="meta">${esc(u.email)}</span>
         <button type="button" class="btn peq" id="otra">No soy yo</button></p>
+      <div id="en-curso" class="en-curso-lista" hidden></div>
       <label>Código de la clase
         <input id="code" class="codigo-input" maxlength="6" required value="${esc(code)}" autocapitalize="characters" spellcheck="false">
       </label>
@@ -64,6 +87,7 @@ function pantallaEntrada(msg = '') {
   const ci = f.querySelector('#code');
   ci.addEventListener('input', () => { ci.value = ci.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
   f.querySelector('#otra').onclick = () => signOut(auth);
+  clasesEnCurso(f.querySelector('#en-curso'));
   f.addEventListener('submit', async e => {
     e.preventDefault();
     const btn = f.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = 'Entrando…';
@@ -132,6 +156,7 @@ async function entrar(code, nombreInvitado = null) {
     alias: S.alias, email: nombreInvitado ? '' : u.email.toLowerCase(), online: true, away: false, lastSeen: serverTimestamp(),
     ...(prev.exists() ? {} : { joinedAt: serverTimestamp(), awayCount: 0 })
   });
+  try { localStorage.setItem('cd-ultima-clase', code); } catch {}
   history.replaceState(null, '', `?c=${code}`);
   presencia(rRef);
   onValue(ref(db, `sessions/${code}`), s => { S.session = s.val(); cambioSesion(); });

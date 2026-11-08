@@ -283,6 +283,13 @@ function elegirGrupo(curso) {
   });
 }
 
+// Lista pública de clases en curso (el alumnado la ve al entrar). Si las reglas aún no
+// la permiten, falla en silencio y todo sigue funcionando con el código.
+function publicarEnCurso(code, d) {
+  return set(ref(db, `liveSessions/${code}`), { owner: U.uid, lessonTitle: d.lessonTitle || '', curso: d.curso || '', grupo: d.grupo || '', startedAt: serverTimestamp() }).catch(() => {});
+}
+function quitarEnCurso(code) { return remove(ref(db, `liveSessions/${code}`)).catch(() => {}); }
+
 async function empezarClase(lessonId, grupo = '') {
   const l = (await get(ref(db, `lessons/${U.uid}/${lessonId}`))).val();
   const items = l?.items || [];
@@ -295,6 +302,7 @@ async function empezarClase(lessonId, grupo = '') {
   const curso = cursoDe(l.curso) ? l.curso : '';
   await set(ref(db, `teacherSessions/${U.uid}/${code}`), { lessonId, lessonTitle: l.title, curso, grupo: curso ? grupo : '', createdAt: serverTimestamp(), items });
   await set(ref(db, `sessions/${code}`), { owner: U.uid, lessonId, lessonTitle: l.title, curso, createdAt: serverTimestamp(), showCode: true, state: estado(items, 0) });
+  publicarEnCurso(code, { lessonTitle: l.title, curso, grupo: curso ? grupo : '' });
   location.hash = `#/directo/${code}`;
 }
 
@@ -815,6 +823,7 @@ async function vistaDirecto(code) {
   app.innerHTML = marco(`<p class="vacio">Cargando clase…</p>`);
   const priv = (await get(ref(db, `teacherSessions/${U.uid}/${code}`))).val();
   if (!priv) { app.innerHTML = marco(`<p class="vacio">No encuentro esa clase. <a href="#/">Volver</a></p>`); return; }
+  if (!priv.endedAt) get(ref(db, `liveSessions/${code}`)).then(x => { if (!x.exists()) publicarEnCurso(code, priv); }).catch(() => {});
   const items = priv.items || [];
   const diapos = (await get(ref(db, `slides/${U.uid}/${priv.lessonId}`))).val() || {};
   const enlace = enlaceAlumno(code);
@@ -980,6 +989,7 @@ async function vistaDirecto(code) {
       await update(ref(db, `sessions/${code}`), { endedAt: serverTimestamp(), 'state/open': false });
       if (C.ses.guests) await permitirInvitados(code, priv.lessonId, false);
       await update(ref(db, `teacherSessions/${U.uid}/${code}`), { endedAt: serverTimestamp() });
+      await quitarEnCurso(code);
       location.hash = `#/informe/${code}`;
     }
   };
@@ -1005,6 +1015,7 @@ async function vistaProyector(code) {
   app.innerHTML = `<p class="vacio">Cargando…</p>`;
   const priv = (await get(ref(db, `teacherSessions/${U.uid}/${code}`))).val();
   if (!priv) { app.innerHTML = `<p class="vacio">No encuentro esa clase.</p>`; return; }
+  if (!priv.endedAt) get(ref(db, `liveSessions/${code}`)).then(x => { if (!x.exists()) publicarEnCurso(code, priv); }).catch(() => {});
   const items = priv.items || [];
   const diapos = (await get(ref(db, `slides/${U.uid}/${priv.lessonId}`))).val() || {};
   const enlace = enlaceAlumno(code);
