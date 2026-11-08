@@ -173,13 +173,25 @@ function vistaInicio() {
     }
     const grupos = [...CURSOS.map(c => ({ id: c.id, nombre: c.nombre, materia: c.materia, ls: lecciones.filter(([, l]) => l.curso === c.id) })),
       { id: 'sin', nombre: 'Sin curso', materia: 'Elige el curso dentro de cada lección', ls: lecciones.filter(([, l]) => !cursoDe(l.curso)) }].filter(g => g.ls.length);
-    el.innerHTML = grupos.map(g => grupoCurso(g.id, g.nombre, g.materia, `${g.ls.length} ${g.ls.length === 1 ? 'lección' : 'lecciones'}`, ordenar(g.ls).map(tarjetaLeccion).join(''))).join('');
+    el.innerHTML = grupos.map((g, i) => grupoCurso('lec-' + g.id, g.id, g.nombre, g.materia, `${g.ls.length} ${g.ls.length === 1 ? 'lección' : 'lecciones'}`, ordenar(g.ls).map(tarjetaLeccion).join(''), i === 0)).join('');
   }
 
   // Subtítulo con el color del curso y su lista debajo
-  const grupoCurso = (curso, nombre, materia, cuenta, lis) => `<section class="grupo-curso curso-${curso}">
-      <h3 class="sub-curso"><span class="sub-curso__chip">${esc(nombre)}</span><span class="sub-curso__materia">${esc(materia)}</span><span class="sub-curso__n">${esc(cuenta)}</span></h3>
-      <ul class="mcr-lista">${lis}</ul></section>`;
+  // Desplegable: se recuerda cuáles dejas abiertos (por defecto, el primero de cada bloque)
+  const leerAbiertos = () => { try { return JSON.parse(localStorage.getItem('cd-desplegados')) || null; } catch { return null; } };
+  const grupoCurso = (clave, curso, nombre, materia, cuenta, lis, primero) => {
+    const ab = leerAbiertos();
+    const abierto = ab ? ab.includes(clave) : primero;
+    return `<details class="grupo-curso curso-${curso}" data-clave="${esc(clave)}" ${abierto ? 'open' : ''}>
+      <summary class="sub-curso"><span class="sub-curso__chip">${esc(nombre)}</span><span class="sub-curso__materia">${esc(materia)}</span><span class="sub-curso__n">${esc(cuenta)}</span></summary>
+      <ul class="mcr-lista">${lis}</ul></details>`;
+  };
+  app.addEventListener('toggle', e => {
+    const d = e.target; if (!d.matches?.('details.grupo-curso')) return;
+    let ab = leerAbiertos() || [...app.querySelectorAll('details.grupo-curso[open]')].map(x => x.dataset.clave);
+    ab = ab.filter(k => k !== d.dataset.clave); if (d.open) ab.push(d.dataset.clave);
+    try { localStorage.setItem('cd-desplegados', JSON.stringify(ab)); } catch {}
+  }, true);
 
   function pintarSesiones() {
     const ul = $('#sesiones'); if (!ul) return;
@@ -199,10 +211,13 @@ function vistaInicio() {
       // En «Todas»: un subtítulo por clase (curso y grupo), en el orden de las pestañas
       const claseDe = s => { const cs = cursoSesion(s); return cursoDe(cs) ? CLASES.find(c => c.curso === cs && c.grupo === (s.grupo || '')) || CLASES.find(c => c.curso === cs) : null; };
       const orden = [...CLASES, null];
+      let k = 0;
       ul.innerHTML = orden.map(c => {
         const de = ss.filter(([, s]) => claseDe(s) === c); if (!de.length) return '';
-        const n = `${de.length} ${de.length === 1 ? 'clase' : 'clases'}`;
-        return c ? grupoCurso(c.curso, c.nombre, c.materia, n, de.map(tarjeta).join('')) : grupoCurso('sin', 'Sin curso', '', n, de.map(tarjeta).join(''));
+        const vivas = de.filter(([, s]) => !s.endedAt).length;
+        const n = `${de.length} ${de.length === 1 ? 'clase' : 'clases'}${vivas ? ` · ${vivas} en curso` : ''}`;
+        const primero = k++ === 0;
+        return c ? grupoCurso('ses-' + c.id, c.curso, c.nombre, c.materia, n, de.map(tarjeta).join(''), primero) : grupoCurso('ses-sin', 'sin', 'Sin curso', '', n, de.map(tarjeta).join(''), primero);
       }).join('');
     }
     $('#mas').hidden = sesiones.length < cuantas;
