@@ -254,7 +254,7 @@ function elegirGrupo(curso) {
   return new Promise(ok => {
     dlg.innerHTML = `<form method="dialog" class="dlg dlg-estrecho curso-${c.id}"><h2>¿Con qué grupo?</h2>
       <p class="ayuda">La clase y su informe quedarán guardados en ese grupo.</p>
-      <div class="grupos">${c.grupos.map(g => `<button class="btn primario grande" value="${g}">${esc(c.nombre)} ${g}</button>`).join('')}</div>
+      <div class="grupos">${c.grupos.map(g => `<button class="btn primario grande" value="${esc(g)}">${g.includes(' y ') ? `Todos (${esc(g)})` : `${esc(c.nombre)} ${esc(g)}`}</button>`).join('')}</div>
       <div class="pie"><button class="btn" value="">Cancelar</button></div></form>`;
     dlg.onclose = () => { dlg.onclose = null; ok(dlg.returnValue || null); };
     dlg.returnValue = '';
