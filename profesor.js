@@ -121,7 +121,7 @@ function vistaInicio() {
   </section>
   <section class="bloque">
     <h2 class="mcr-seccion" id="tit-sesiones">Clases dadas</h2>
-    <ul class="mcr-lista" id="sesiones"><li class="vacio">Cargando…</li></ul>
+    <div id="sesiones"><p class="vacio">Cargando…</p></div>
     <button class="mcr-btn" id="mas" hidden>Ver clases más antiguas</button>
   </section>`);
 
@@ -162,9 +162,6 @@ function vistaInicio() {
   const vacia = (msg, boton = true) => `<div class="mcr-vacio"><span>${msg}</span>${boton ? `<button class="mcr-btn mcr-btn--prim" data-nueva>${lecciones.length ? 'Crear una lección' : 'Crear la primera lección'}</button>` : ''}</div>`;
   const ordenar = ls => ls.sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
 
-  // Secciones desplegables abiertas en «Todas» (se recuerdan)
-  const leerAbiertas = () => { try { return JSON.parse(localStorage.getItem('cd-abiertas')); } catch { return null; } };
-  const guardarAbiertas = a => { try { localStorage.setItem('cd-abiertas', JSON.stringify(a)); } catch {} };
 
   function pintarLecciones() {
     const el = $('#lecciones'); if (!el) return;
@@ -176,29 +173,38 @@ function vistaInicio() {
     }
     const grupos = [...CURSOS.map(c => ({ id: c.id, nombre: c.nombre, materia: c.materia, ls: lecciones.filter(([, l]) => l.curso === c.id) })),
       { id: 'sin', nombre: 'Sin curso', materia: 'Elige el curso dentro de cada lección', ls: lecciones.filter(([, l]) => !cursoDe(l.curso)) }].filter(g => g.ls.length);
-    let abiertas = leerAbiertas();
-    if (!abiertas) { const ult = sesiones[0] && cursoSesion(sesiones[0][1]); abiertas = [cursoDe(ult) ? ult : grupos[0]?.id]; }
-    el.innerHTML = grupos.map(g => `<details class="mcr-grupo ${g.id === 'sin' ? 'curso-sin' : 'curso-' + g.id}" data-g="${g.id}" ${abiertas.includes(g.id) ? 'open' : ''}>
-      <summary><span class="mcr-grupo__chip">${esc(g.nombre)}</span><span class="mcr-grupo__nombre">${esc(g.materia)}</span><span class="mcr-grupo__n">${g.ls.length} ${g.ls.length === 1 ? 'lección' : 'lecciones'}</span></summary>
-      <ul class="mcr-lista">${ordenar(g.ls).map(tarjetaLeccion).join('')}</ul></details>`).join('');
-    el.querySelectorAll('details').forEach(d => d.ontoggle = () => {
-      guardarAbiertas([...el.querySelectorAll('details[open]')].map(x => x.dataset.g));
-    });
+    el.innerHTML = grupos.map(g => grupoCurso(g.id, g.nombre, g.materia, `${g.ls.length} ${g.ls.length === 1 ? 'lección' : 'lecciones'}`, ordenar(g.ls).map(tarjetaLeccion).join(''))).join('');
   }
+
+  // Subtítulo con el color del curso y su lista debajo
+  const grupoCurso = (curso, nombre, materia, cuenta, lis) => `<section class="grupo-curso curso-${curso}">
+      <h3 class="sub-curso"><span class="sub-curso__chip">${esc(nombre)}</span><span class="sub-curso__materia">${esc(materia)}</span><span class="sub-curso__n">${esc(cuenta)}</span></h3>
+      <ul class="mcr-lista">${lis}</ul></section>`;
 
   function pintarSesiones() {
     const ul = $('#sesiones'); if (!ul) return;
     const ss = sesiones.filter(([, s]) => pasa(cursoSesion(s), s.grupo, true));
-    ul.innerHTML = ss.length ? ss.map(([code, s]) => {
-      const cs = cursoSesion(s);
-      return `<li class="mcr-tarjeta ${s.endedAt ? 'mcr-tarjeta--fin' : 'mcr-tarjeta--vivo'}">
+    const tarjeta = ([code, s]) => {
+      return `<li class="mcr-tarjeta ${s.endedAt ? '' : 'en-curso'}">
       <div class="fila-info"><span class="mcr-tarjeta__titulo">${esc(s.lessonTitle)}</span>
-        <span class="mcr-tarjeta__meta">${filtro === 'todas' || filtro === 'sin' ? chipClase(cs, s.grupo) : ''}${fecha(s.createdAt)}, código ${code}</span></div>
+        <span class="mcr-tarjeta__meta">${fecha(s.createdAt)}, código ${code}</span></div>
       <div class="mcr-tarjeta__acc">
         ${s.endedAt ? '' : `<span class="mcr-vivo">En curso</span><a class="mcr-btn mcr-btn--peq mcr-btn--prim" href="#/directo/${code}">Volver al directo</a>`}
         <a class="mcr-btn mcr-btn--peq" href="#/informe/${code}">Informe</a>
       </div></li>`;
-    }).join('') : `<li class="mcr-vacio"><span>${sesiones.length ? 'Aún no has dado clase con este grupo.' : 'Cuando des tu primera clase, aparecerá aquí con su informe.'}</span></li>`;
+    };
+    if (!ss.length) ul.innerHTML = `<div class="mcr-vacio"><span>${sesiones.length ? 'Aún no has dado clase con este grupo.' : 'Cuando des tu primera clase, aparecerá aquí con su informe.'}</span></div>`;
+    else if (filtro !== 'todas') ul.innerHTML = `<ul class="mcr-lista">${ss.map(tarjeta).join('')}</ul>`;
+    else {
+      // En «Todas»: un subtítulo por clase (curso y grupo), en el orden de las pestañas
+      const claseDe = s => { const cs = cursoSesion(s); return cursoDe(cs) ? CLASES.find(c => c.curso === cs && c.grupo === (s.grupo || '')) || CLASES.find(c => c.curso === cs) : null; };
+      const orden = [...CLASES, null];
+      ul.innerHTML = orden.map(c => {
+        const de = ss.filter(([, s]) => claseDe(s) === c); if (!de.length) return '';
+        const n = `${de.length} ${de.length === 1 ? 'clase' : 'clases'}`;
+        return c ? grupoCurso(c.curso, c.nombre, c.materia, n, de.map(tarjeta).join('')) : grupoCurso('sin', 'Sin curso', '', n, de.map(tarjeta).join(''));
+      }).join('');
+    }
     $('#mas').hidden = sesiones.length < cuantas;
   }
   const pintarTodo = () => { pintarPestanas(); pintarLecciones(); pintarSesiones(); };

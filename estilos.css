@@ -713,3 +713,12 @@ dialog:has(.dlg-editor) { width: 100vw; max-width: 100vw; height: 100dvh; max-he
 .hero .mas-menu .btn:hover { border-color: rgba(255, 255, 255, .4); }
 .mas-nota { margin: .2rem .6rem .35rem; font-size: .85rem; color: rgba(255, 255, 255, .7); }
 .grupos .btn:only-child, .grupos .btn:nth-child(3):last-child { grid-column: 1 / -1; }
+
+/* Inicio: lecciones y clases dadas agrupadas por curso, con subtítulo de su color */
+.grupo-curso { margin-bottom: 1.5rem; }
+.sub-curso { display: flex; align-items: center; gap: .6rem; margin: 0 0 .6rem; padding-bottom: .4rem; border-bottom: 2px solid var(--acento); font-family: var(--font-marca); font-size: 1.05rem; }
+.sub-curso__chip { background: var(--acento); color: var(--sobre-acento, #fff); font-weight: 700; font-size: .85rem; letter-spacing: .04em; padding: .3rem .6rem; border-radius: 4px; }
+.sub-curso__materia { font-weight: 600; color: var(--tinta); }
+.sub-curso__n { margin-left: auto; font-size: .8rem; font-weight: 600; color: var(--tinta-suave); }
+.grupo-curso .mcr-tarjeta, #lecciones .mcr-tarjeta, #sesiones .mcr-tarjeta { border-left: 5px solid var(--acento); }
+.curso-sin { --acento: #94A3B8; --texto: #475569; --sobre-acento: #1E293B; }
