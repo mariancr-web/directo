@@ -1,6 +1,6 @@
-import { auth, db, configurado } from './firebase.js';
+import { auth, db, configurado, enApp } from './firebase.js';
 import { NOMBRE_APP } from './config.js';
-import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, remove, onValue, serverTimestamp, query, orderByChild, limitToLast } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 import { esc, rico, conDatos, conNombres, TIPOS, nombreTipo, esActividad, esCorregible, itemPublico, comprobar, textoRespuesta, solucionTexto, generarCodigo, nuevoId, parseNum, fecha, evaluar, postsMuro, MAX_MURO, POR_PARTES, pintarPartes, solucionesHuecos, filasTabla, tieneVariantes, valores, datosTexto, fmtNum, infoEnlace, buscarEnlaces, CURSOS, CLASES, cursoDe, nombreClase, colorCurso, reducirImagen, alternativas, generarSopa, normSopa, pintarSopa } from './lib.js';
 import { crearEditor, tarjetasTipos, ICONOS } from './editor.js';
@@ -58,7 +58,7 @@ function pantallaLogin() {
     <button class="mcr-btn mcr-btn--prim mcr-btn--ancho" id="google">Entrar con Google</button>
     <p class="aviso" id="err" role="alert"></p></section></div>`;
   $('#google').onclick = async () => {
-    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    try { if (enApp) await signInWithRedirect(auth, new GoogleAuthProvider()); else await signInWithPopup(auth, new GoogleAuthProvider()); }
     catch (e) { $('#err').textContent = `No se ha podido iniciar sesión (${e.code || e.message}). Si usas GitHub Pages, revisa que su dominio esté en los dominios autorizados de Firebase.`; }
   };
 }

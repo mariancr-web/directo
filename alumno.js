@@ -1,6 +1,6 @@
-import { auth, db, configurado } from './firebase.js';
+import { auth, db, configurado, enApp } from './firebase.js';
 import { NOMBRE_APP, DOMINIO_ALUMNADO } from './config.js';
-import { GoogleAuthProvider, signInWithPopup, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { ref, get, set, update, onValue, onDisconnect, serverTimestamp, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 import { esc, rico, conDatos, esActividad, infoEnlace, lista, MAX_MURO, POR_PARTES, pintarPartes, leerPartes, moverOrden, aciertosPorParte, reducirImagen, colorCurso, pintarSopa, jugarMemory, jugarSopa, lineaSopa, palabraSopa, nombreTipo, comprobar, respuestaHTML, solucionTexto, esCorregible } from './lib.js';
 
@@ -14,7 +14,8 @@ async function iniciarSesion() {
   const prov = new GoogleAuthProvider();
   // Muestra directamente las cuentas del colegio en el selector de Google
   prov.setCustomParameters({ hd: DOMINIO_ALUMNADO, prompt: 'select_account' });
-  await signInWithPopup(auth, prov);
+  if (enApp) await signInWithRedirect(auth, prov);
+  else await signInWithPopup(auth, prov);
 }
 
 // ── Pantalla de entrada ─────────────────────────────────────────

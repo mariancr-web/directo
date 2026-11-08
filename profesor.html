@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="theme-color" content="#2563EB">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Clase en directo (profesorado)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,6 +14,10 @@
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/mhchem.min.js"></script>
 <link rel="stylesheet" href="estilos.css">
+<link rel="manifest" href="manifest-profesor.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Clase · Profe">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="icon" href="https://marca.mariancr.es/logo/simbolo/mcr_general.svg" type="image/svg+xml">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -20,5 +26,6 @@
 <div id="app"><p class="vacio">Cargando…</p></div>
 <dialog id="dlg"></dialog>
 <script type="module" src="profesor.js"></script>
+<script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));</script>
 </body>
 </html>
