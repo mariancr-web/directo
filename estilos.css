@@ -737,3 +737,8 @@ details.grupo-curso > summary:hover .sub-curso__materia { color: var(--texto); }
 .en-curso-btn:hover, .en-curso-btn:focus-visible { background: var(--suave, #EFF6FF); }
 .en-curso-btn__titulo { font-weight: 600; }
 .en-curso-btn__meta { font-size: .85rem; color: var(--tinta-suave, #475569); }
+
+/* Diapositiva para escribir encima (editor) */
+.miniatura { position: relative; }
+.mini-escribir { position: absolute; left: 4px; bottom: 4px; display: inline-flex; align-items: center; gap: .25rem; padding: .1rem .4rem; border-radius: 999px; background: var(--tinta, #1E293B); color: #fff; font: 600 .7rem/1.4 Barlow, sans-serif; }
+.btn svg { vertical-align: -2px; }

@@ -317,9 +317,10 @@ async function vistaEditor(id) {
   const guardar = () => update(lRef, { items, updatedAt: serverTimestamp() });
 
   function fila(it, i) {
-    const mini = it.type === 'slide'
-      ? (diapos[it.page] ? `<img src="${diapos[it.page]}" alt="">` : '')
-      : `<span class="mini-act">${nombreTipo(it)}</span>`;
+    const fondo = it.type === 'slide' ? it.page : it.type === 'draw' ? it.background : null;
+    const mini = fondo && diapos[fondo]
+      ? `<img src="${diapos[fondo]}" alt="">${it.type === 'draw' ? `<span class="mini-escribir">${ICO_LAPIZ} Escriben encima</span>` : ''}`
+      : it.type === 'slide' ? '' : `<span class="mini-act">${nombreTipo(it)}</span>`;
     let meta = '';
     if (it.type === 'quiz') meta = `${it.options.length} opciones`;
     if (it.type === 'number') meta = tieneVariantes(it) ? `Con datos distintos para cada alumno: ${it.formula}, tolerancia ${it.tolerance}%` : `Solución ${solucionTexto(it)}, tolerancia ${it.tolerance}%`;
@@ -342,6 +343,8 @@ async function vistaEditor(id) {
         <button class="btn-ico" data-up="${i}" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>${ICO.arriba}</button>
         <button class="btn-ico" data-down="${i}" aria-label="Bajar" ${i === items.length - 1 ? 'disabled' : ''}>${ICO.abajo}</button>
         ${it.type !== 'slide' ? `<button class="btn peq" data-edit="${i}">Editar</button>` : ''}
+        ${it.type === 'slide' ? `<button class="btn peq" data-escribir="${i}" title="El alumnado podrá escribir o dibujar sobre esta diapositiva y enviártelo">${ICO_LAPIZ} Escribir encima</button>` : ''}
+        ${it.type === 'draw' && it.background ? `<button class="btn peq" data-solo="${i}" title="Vuelve a ser una diapositiva normal, sin escribir encima">Solo diapositiva</button>` : ''}
         <button class="btn peq" data-add="${i}">Añadir actividad debajo</button>
         <button class="btn peq peligro" data-del="${i}">Quitar</button>
       </div></li>`;
@@ -381,6 +384,8 @@ async function vistaEditor(id) {
         const msg = items[i].type === 'slide' ? '¿Quitar esta diapositiva de la lección?' : '¿Eliminar esta actividad?';
         if (confirm(msg)) { items.splice(i, 1); guardar(); pintar(); }
       }
+      if (d.escribir) { const i = +d.escribir; items[i] = paraEscribir(items[i].page, true); guardar(); pintar(); }
+      if (d.solo) { const i = +d.solo; items[i] = { id: nuevoId(), type: 'slide', page: items[i].background, manual: true }; guardar(); pintar(); }
       if (d.edit) { const i = +d.edit; dialogoActividad(items[i], paginas(), nuevo => { items[i] = nuevo; guardar(); pintar(); }, { diapos }); }
       if (d.add !== undefined) { const i = +d.add; dialogoActividad(null, paginas(), (...nuevos) => { items.splice(i + 1, 0, ...nuevos); guardar(); pintar(); }, { diapos }); }
     };
@@ -399,7 +404,7 @@ async function vistaEditor(id) {
       pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
       const n = pdf.numPages;
-      const encontrados = [];
+      const encontrados = [], aEscribir = new Set();
       for (let p = 1; p <= n; p++) {
         prog.textContent = `Procesando página ${p} de ${n}…`;
         const page = await pdf.getPage(p);
@@ -411,18 +416,23 @@ async function vistaEditor(id) {
         ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
         await page.render({ canvasContext: ctx, viewport: vp }).promise;
         const url = c.toDataURL('image/jpeg', 0.75);
+        if (await esDeEscribir(page, c)) aEscribir.add(p);
         await set(ref(db, `slides/${U.uid}/${id}/${p}`), url);
         diapos[p] = url;
         encontrados.push(...await enlacesDePagina(page, p));
       }
       for (const k of Object.keys(diapos)) if (Number(k) > n) { await remove(ref(db, `slides/${U.uid}/${id}/${k}`)); delete diapos[k]; }
-      const existentes = new Set(items.filter(i => i.type === 'slide').map(i => i.page));
-      items = items.filter(it => it.type !== 'slide' || it.page <= n);
-      for (let p = 1; p <= n; p++) if (!existentes.has(p)) items.push({ id: nuevoId(), type: 'slide', page: p });
+      const existentes = new Set(items.filter(i => i.type === 'slide').map(i => i.page).concat(items.filter(i => i.type === 'draw' && (i.auto || i.manual)).map(i => i.background)));
+      items = items.filter(it => (it.type !== 'slide' || it.page <= n) && !(it.type === 'draw' && (it.auto || it.manual) && it.background > n));
+      // Diapositivas para escribir encima: se detectan solas; lo que hayas cambiado a mano se respeta
+      items = items.map(it => it.type === 'slide' && !it.manual && aEscribir.has(it.page) ? paraEscribir(it.page)
+        : it.type === 'draw' && it.auto && !aEscribir.has(it.background) ? { id: nuevoId(), type: 'slide', page: it.background } : it);
+      for (let p = 1; p <= n; p++) if (!existentes.has(p)) items.push(aEscribir.has(p) ? paraEscribir(p) : { id: nuevoId(), type: 'slide', page: p });
       await update(lRef, { pageCount: n });
       await guardar();
       pintar();
-      $('#progreso').textContent = `Listo: ${n} ${n === 1 ? 'página cargada' : 'páginas cargadas'}. Ahora puedes añadir actividades.`;
+      const nEsc = items.filter(i => i.type === 'draw' && i.auto).length;
+      $('#progreso').textContent = `Listo: ${n} ${n === 1 ? 'página cargada' : 'páginas cargadas'}.` + (nEsc ? ` ${nEsc} ${nEsc === 1 ? 'diapositiva es' : 'diapositivas son'} para escribir encima (puedes cambiarlo con «Solo diapositiva» o «Escribir encima»).` : ' Ahora puedes añadir actividades.');
       const yaEstan = new Set(items.filter(i => i.type === 'link').map(i => i.url));
       const nuevos = encontrados.filter(e => !yaEstan.has(e.info.url));
       if (nuevos.length) dialogoEnlacesPDF(nuevos, sel => {
@@ -444,6 +454,38 @@ async function vistaEditor(id) {
   }
 
   pintar();
+}
+
+const ICO_LAPIZ = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/></svg>';
+
+// Diapositiva convertida en «dibujar encima». auto = la detectó la web; manual = la cambiaste tú
+function paraEscribir(page, manual = false) {
+  return { id: nuevoId(), type: 'draw', prompt: 'Escribe o dibuja sobre la diapositiva y envíalo.', background: page, ...(manual ? { manual: true } : { auto: true }) };
+}
+
+// ¿Es una diapositiva para escribir encima? Sí si el PDF lleva la marca «✎ Escribe encima»
+// (texto, aunque sea diminuto) o si al menos un 30 % de la página es rosa claro (fondo de ejercicios).
+const MARCA_ESCRIBIR = /✎|escribe\s+encima|escribir\s+encima/i;
+async function esDeEscribir(page, canvas) {
+  try {
+    const tc = await page.getTextContent();
+    if (MARCA_ESCRIBIR.test(tc.items.map(t => t.str).join(' '))) return true;
+  } catch { /* sin texto: se mira el color */ }
+  return fraccionRosa(canvas) >= 0.3;
+}
+function fraccionRosa(canvas) {
+  const w = 96, h = Math.max(1, Math.round(96 * canvas.height / canvas.width));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(canvas, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data;
+  let rosa = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    // Rosa claro: rojo alto, verde y azul por debajo, claro (no el rojo oscuro de las portadillas)
+    if (r >= 225 && r - g >= 25 && r - b >= 15 && g >= 130 && b >= 130) rosa++;
+  }
+  return rosa / (w * h);
 }
 
 // Enlaces de una página del PDF: los vínculos y las direcciones escritas en el texto
